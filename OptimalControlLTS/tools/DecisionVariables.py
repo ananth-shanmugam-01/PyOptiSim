@@ -80,20 +80,20 @@ def addParameter(parameters, sym, name, value):
     
     parameters.sym    = ca.vertcat(parameters.sym, sym)
     parameters.name   = np.append(parameters.name, name)
-    parameters.value.append(np.append(value))
+    parameters.value.append(np.array(value))
     parameters.num_g  = parameters.sym.size(1) 
     
     return parameters
 
 #%% Testing
 
-states, controls, parameters = initialiseDecisionVariables()   
+# states, controls, parameters = initialiseDecisionVariables()   
 
-velocity = ca.SX.sym('velocity')
-velocity_init = np.linspace(0, 10, 12) 
-states = addState(states, velocity, 'velocity', 'der_velocity', 1, (0, 100), 1, (10, 0), velocity_init)
+# velocity = ca.SX.sym('velocity')
+# velocity_init = np.linspace(0, 10, 12) 
+# states = addState(states, velocity, 'velocity', 'der_velocity', 1, (0, 100), 1, (10, 0), velocity_init)
 
-mass     = ca.SX.sym('mass')
-mass_init = np.ones(10) * 1 
-states = addState(states, mass, 'mass', 'der_mass', 1, (0, 20), 1, (10, 0), mass_init)
+# mass     = ca.SX.sym('mass')
+# mass_init = np.ones(10) * 1 
+# states = addState(states, mass, 'mass', 'der_mass', 1, (0, 20), 1, (10, 0), mass_init)
  

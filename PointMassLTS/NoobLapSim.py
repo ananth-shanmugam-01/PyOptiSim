@@ -7,7 +7,7 @@ Man is trying something stupid and silly, but why even do anything else?
 """
 
 import os
-os.chdir('C:/Users/admin/Desktop/GitHub/BarelyOptimalLapSim')
+os.chdir('C:/Users/admin/Desktop/GitHub/BarelyOptimalLapSim/PointMassLTS')
 
 import numpy as np
 import matplotlib.pyplot as plt

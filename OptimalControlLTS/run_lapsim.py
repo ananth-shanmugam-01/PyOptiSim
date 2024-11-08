@@ -5,6 +5,9 @@ import casadi as ca
 import numpy as np
 import matplotlib.pyplot as plt
 
+import tools.DecisionVariables as DecisionVariables
+import tools.Mesh as Mesh
+
 # Outline
 
 # 1. Lagrange Polynomials
@@ -14,75 +17,66 @@ import matplotlib.pyplot as plt
 # 3. Model Definition
 # 3a. Model Parameterisation
 # 3b. Model Dynamics (States, Controls, Parameters, )
-#
 
+#%% Define Lagrange Polynomials
+
+collocation_degree= 3
+tau = np.array(ca.collocation_points(collocation_degree, 'legendre'))
+
+[C, D, B] = ca.collocation_coeff(tau)
+
+#%% Mesh Definition
+
+endPoint = 50 # [m] Mesh Distance
+numIntervals = 15 # Number of Phases
+
+track = Mesh.mesh( endPoint, numIntervals, collocation_degree, tau )
+
+#%% Define Decision Variables
+
+states, controls, parameters = DecisionVariables.initialiseDecisionVariables()
 
 #%% Define Model 
 
 # States
-x = []
 velocity = ca.SX.sym('velocity')
+velocity_init = np.linspace(0, 10, 12) 
+states = DecisionVariables.addState(states, velocity, 'velocity', 'der_velocity', 1, (0, 100), 1, (10, 0), velocity_init)
+
 mass     = ca.SX.sym('mass')
-x =  ca.vertcat(x, velocity, mass)
-num_x = x.size(1)
+mass_init = np.ones(10) * 1 
+states = DecisionVariables.addState(states, mass, 'mass', 'der_mass', 1, (0, 20), 1, (10, 0), mass_init)
 
 # Controls
 u = []
 thrust = ca.SX.sym('thrust')
-u = ca.vertcat(u, thrust)
-num_u = u.size(1)
+thrust_init = np.ones(len(track.mesh))
+controls = DecisionVariables.addControl(controls, thrust, 'thrust',1, (0, 20), thrust_init)
 
 # Parameters
-p = []
 g = ca.SX.sym('g')
-p = ca.vertcat(p, g)
-num_g = p.size(1)
+g_mesh = 9.81 * np.ones(len(track.mesh))
+parameters = DecisionVariables.addParameter(parameters, g, 'g', g_mesh)
 
 # Assemble Model 
 c = 0.05 # Consumption factor
 Sf = 1/velocity
 
 # Model Dynamics
-rhs = ca.SX.sym('rhs', num_x)
+rhs = ca.SX.sym('rhs', states.num_x)
 rhs[0] = Sf * (g - thrust/mass)
 rhs[1] = Sf * (-c * thrust)
 
 # Model Penalties
 L = Sf
 
-f = ca.Function('f', [x, u, g], [rhs, L],['x', 'u', 'g'], ['rhs', 'L'])
+f = ca.Function('f', [states.sym, controls.sym, parameters.sym], [rhs, L],['x', 'u', 'g'], ['rhs', 'L'])
 print(f)
 
 
 [x_dot, cost] = f([8, 1], 4, 1);
 print(x_dot)
 print(cost)
-
-#%% Define Lagrange Polynomials
-
-d = 3
-tau = np.array(ca.collocation_points(d, 'legendre'))
-
-[C, D, B] = ca.collocation_coeff(tau)
-
-#%% Mesh Discretization
-
-s = 50 # [m] Mesh Distance
-N = 15 # Number of Phases
-h = s/N # mesh size
-
-meshInterval = np.linspace(0, s, N+1)  
-numIntervals = N
-
-remesh = np.zeros((N, d+1))
-
-for i in range(len(meshInterval)-1):
-    dMesh = h # meshInterval[i+1] - meshInterval[i]
-    remesh[i,0] = meshInterval[i]
-    for ii in range(d):
-        remesh[i, ii+1] = remesh[i,0] + dMesh*tau[ii]
-
-remesh = np.vstack( (np.reshape(remesh, (np.size(remesh),1)), meshInterval[-1]) )
 
 #%% Create Opti Problem
 # Decision Variables at each collocation point
@@ -95,9 +89,9 @@ Xs = []
 Us = []
 Gs = []
 
-Xk = opti.variable( num_x )
-Uk = opti.variable( num_u )
-Gk = opti.parameter( num_g )
+Xk = opti.variable( states.num_x )
+Uk = opti.variable( controls.num_u )
+Gk = opti.parameter( parameters.num_g )
 
 Xs = ca.horzcat(Xs, Xk ) 
 Us = ca.horzcat(Us, Uk ) 
@@ -106,9 +100,9 @@ Gs = ca.horzcat(Gs, Gk )
 
 for i in range(numIntervals):
     
-    Xc = opti.variable( num_x, d )
-    Uc = opti.variable( num_u, d )
-    Gc = opti.parameter( num_g, d )
+    Xc = opti.variable( states.num_x, collocation_degree )
+    Uc = opti.variable( controls.num_u, collocation_degree )
+    Gc = opti.parameter( parameters.num_g, collocation_degree )
     
     Xs = ca.horzcat(Xs, Xc ) 
     Us = ca.horzcat(Us, Uc ) 
@@ -116,23 +110,23 @@ for i in range(numIntervals):
     
     rhs, L = f(Xc, Uc, Gc)
     
-    cost = cost + np.matmul( L , B * dMesh )
+    cost = cost + np.matmul( L , B * track.meshSize )
     
     # Bring together all the points in this phase [0, 1, 2, 3]
     Z_s = ca.horzcat( Xk , Xc )
     Z_u = ca.horzcat( Uk , Uc )
     
     # Get slope of the interpolating polynomial
-    Pidot = (1 / dMesh) * np.matmul( Z_s , C )
+    Pidot = (1 / track.meshSize) * np.matmul( Z_s , C )
     
     opti.subject_to( Pidot == rhs )
     
     Xk_end = np.matmul( Z_s, D )
     Uk_end = np.matmul( Z_u, D )
     
-    Xk = opti.variable( num_x )
-    Uk = opti.variable( num_u )
-    Gk = opti.parameter( num_g )
+    Xk = opti.variable( states.num_x )
+    Uk = opti.variable( controls.num_u )
+    Gk = opti.parameter( parameters.num_g )
 
     opti.subject_to( Xk_end == Xk )
     opti.subject_to( Uk_end == Uk)
@@ -143,7 +137,7 @@ for i in range(numIntervals):
 
 #%% Provide Parameters and Bounds
 
-g_mesh = 9.81 * np.ones(len(remesh))
+g_mesh = 9.81 * np.ones(len(track.mesh))
 
 opti.set_value(Gs, g_mesh)
 
@@ -185,13 +179,13 @@ g_opt = np.array(opti.value(Gs))
 
 # Create two subplots and unpack the output array immediately
 f, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True)
-ax1.plot( remesh , x_opt[0,:], '-o')
+ax1.plot( track.mesh , x_opt[0,:], '-o')
 ax1.set_title('Velocity Trajectory')
 
-ax2.plot(remesh , x_opt[1,:], '-o')
+ax2.plot(track.mesh , x_opt[1,:], '-o')
 ax2.set_title('Mass State Trajectory')
 
-ax3.plot(remesh , u_opt, '-o')
+ax3.plot(track.mesh , u_opt, '-o')
 ax3.set_title('Thrust Control Trajectory')
     
     
