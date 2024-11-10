@@ -5,8 +5,8 @@ import casadi as ca
 import numpy as np
 import matplotlib.pyplot as plt
 
-import tools.DecisionVariables as DecisionVariables
-import tools.Mesh as Mesh
+import src.tools.DecisionVariables as DecisionVariables
+import src.tools.Mesh as Mesh
 
 # Outline
 
@@ -39,19 +39,20 @@ states, controls, parameters = DecisionVariables.initialiseDecisionVariables()
 #%% Define Model 
 
 # States
+# addState(states, sym, name, der_name, scale, bounds, BC, BC_Vals, initialSolution):
+# BC - 0 - No BC, 1 - Initial Fixed, 2 - Final Fixed, 3 - continuity, 4 - Initial and Terminal Fixed
 velocity = ca.SX.sym('velocity')
-velocity_init = np.linspace(0, 10, 12) 
-states = DecisionVariables.addState(states, velocity, 'velocity', 'der_velocity', 1, (0, 100), 1, (10, 0), velocity_init)
+velocity_init = 10 * np.ones(len(track.mesh)) 
+states = DecisionVariables.addState(states, velocity, 'velocity', 'der_velocity', 10, (0, 100), 4, (10, 0), velocity_init)
 
 mass     = ca.SX.sym('mass')
-mass_init = np.ones(10) * 1 
-states = DecisionVariables.addState(states, mass, 'mass', 'der_mass', 1, (0, 20), 1, (10, 0), mass_init)
+mass_init = 1 * np.ones(len(track.mesh)) 
+states = DecisionVariables.addState(states, mass, 'mass', 'der_mass', 1, (0, 10), 1, (1, 0), mass_init)
 
 # Controls
-u = []
 thrust = ca.SX.sym('thrust')
 thrust_init = np.ones(len(track.mesh))
-controls = DecisionVariables.addControl(controls, thrust, 'thrust',1, (0, 20), thrust_init)
+controls = DecisionVariables.addControl(controls, thrust, 'thrust',10, (0, 20), thrust_init)
 
 # Parameters
 g = ca.SX.sym('g')
@@ -73,7 +74,7 @@ L = Sf
 f = ca.Function('f', [states.sym, controls.sym, parameters.sym], [rhs, L],['x', 'u', 'g'], ['rhs', 'L'])
 print(f)
 
-
+# Test Function
 [x_dot, cost] = f([8, 1], 4, 1);
 print(x_dot)
 print(cost)
@@ -108,7 +109,7 @@ for i in range(numIntervals):
     Us = ca.horzcat(Us, Uc ) 
     Gs = ca.horzcat(Gs, Gc ) 
     
-    rhs, L = f(Xc, Uc, Gc)
+    rhs, L = f(Xc, Uc, Gc) # Still need to bring in path constraints
     
     cost = cost + np.matmul( L , B * track.meshSize )
     
@@ -116,10 +117,12 @@ for i in range(numIntervals):
     Z_s = ca.horzcat( Xk , Xc )
     Z_u = ca.horzcat( Uk , Uc )
     
-    # Get slope of the interpolating polynomial
+    # Get slope of the interpolating polynomial    
     Pidot = (1 / track.meshSize) * np.matmul( Z_s , C )
-    
-    opti.subject_to( Pidot == rhs )
+
+    # Scaling the Equality Constraints
+    for ii in range(Pidot.shape[0]):
+        opti.subject_to( Pidot[ii,:] / states.scale[ii] == rhs[ii,:] / states.scale[ii] )
     
     Xk_end = np.matmul( Z_s, D )
     Uk_end = np.matmul( Z_u, D )
@@ -135,33 +138,55 @@ for i in range(numIntervals):
     Us = ca.horzcat(Us, Uk ) 
     Gs = ca.horzcat(Gs, Gk ) 
 
-#%% Provide Parameters and Bounds
+#%% Decision Variable Settings
 
-g_mesh = 9.81 * np.ones(len(track.mesh))
+# States
+for i in range(states.num_x):
+    
+    # State Bounds
+    opti.subject_to( states.lb[i] / states.scale[i] <= Xs[i,:] / states.scale[i])
+    opti.subject_to( Xs[i,:] / states.scale[i] <= states.ub[i] / states.scale[i])
+    
+    # Initial Solution
+    opti.set_initial( Xs[i,:], states.x_init[i] )
+    
+    # Boundary Conditions
+    # BC - 0 - No BC, 1 - Initial Fixed, 2 - Final Fixed, 3 - continuity, 4 - Initial and Terminal Fixed
+    if states.BC[i] == 4:
+        # Initial and Terminal Fixed
+        opti.subject_to( Xs[i, 0] / states.scale[i] == states.BCini[i] / states.scale[i])
+        opti.subject_to( Xs[i, -1] / states.scale[i] == states.BCend[i] / states.scale[i] )
+                        
+    elif states.BC[i] == 3:
+        # Continuity
+        opti.subject_to( Xs[i, 0] / states.scale[i] == Xs[i, -1] / states.scale[i])
+    
+    elif states.BC[i] == 2:
+        # Final Value Fixed
+        opti.subject_to( Xs[i, -1] / states.scale[i] == states.BCend[i] / states.scale[i] )
+    
+    elif states.BC[i] == 1:
+        # Initial Value Fixed
+        opti.subject_to( Xs[i, 0] / states.scale[i] == states.BCini[i] / states.scale[i])
+        
+    else:
+        # No Boundary Condition
+        raise ValueError("Boundary Conditions are Incorrectly Defined")     
+   
 
-opti.set_value(Gs, g_mesh)
+# Controls
+for i in range(controls.num_u):
+    
+    # Control Bounds
+    opti.subject_to( controls.lb[i] / controls.scale[i] <= Us[i,:] / controls.scale[i] )
+    opti.subject_to( Us[i,:] / controls.scale[i] <= controls.ub[i] / controls.scale[i])
+    
+    # Initial Solution
+    opti.set_initial( Us[i,:], controls.u_init[i] )
 
-# Initial Constraints
-opti.subject_to(Xs[0,0] == 10)
-opti.subject_to(Xs[1,0] == 1)
-
-# Terminal Constraints
-opti.subject_to(Xs[0, -1] == 0)
-
-# State Bounds
-opti.subject_to( 0 <= Us[0,:] )
-opti.subject_to( Us[0,:] <= 20)
-
-opti.subject_to( 0 <= Xs[0,:] )
-opti.subject_to( Xs[0,:] <= 99999 )
-
-opti.subject_to( 0 <= Xs[1,:] )
-opti.subject_to( Xs[1,:] <= 99999 )
-
-# Initial Solution
-opti.set_initial( Us, 1 )
-opti.set_initial( Xs[0,:] , 10 )
-opti.set_initial( Xs[1,:] , 1)
+# Parameters
+for i in range(parameters.num_g):
+    opti.set_value( Gs[i,:], parameters.value[i] )
 
 # Objective
 opti.minimize( cost )

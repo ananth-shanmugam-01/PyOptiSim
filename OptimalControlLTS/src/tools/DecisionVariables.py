@@ -49,7 +49,7 @@ def addState(states, sym, name, der_name, scale, bounds, BC, BC_Vals, initialSol
     states.sym        = ca.vertcat(states.sym, sym)
     states.name       = np.append(states.name, name)
     states.der_names  = np.append(states.der_names, der_name)
-    states.scale      = np.append(states.scale, scale)
+    states.scale      = np.append(states.scale, scale )
     states.lb         = np.append(states.lb, bounds[0])
     states.ub         = np.append(states.ub, bounds[1])
     states.BC         = np.append(states.BC, BC)
@@ -68,7 +68,7 @@ def addControl(controls, sym, name, scale, bounds, initialSolution):
     
     controls.sym      = ca.vertcat(controls.sym, sym)
     controls.name     = np.append(controls.name, name)
-    controls.scale    = np.append(controls.scale, scale)
+    controls.scale    = np.append(controls.scale, scale )
     controls.lb       = np.append(controls.lb, bounds[0])
     controls.ub       = np.append(controls.ub, bounds[1])
     controls.u_init.append(np.array(initialSolution))
