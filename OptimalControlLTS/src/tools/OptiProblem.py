@@ -89,7 +89,11 @@ def createOptiProblem(model):
         elif model.states.BC[i] == 1:
             # Initial Value Fixed
             opti.subject_to( Xs[i, 0] / model.states.scale[i] == model.states.BCini[i] / model.states.scale[i])
-            
+        
+        elif model.states.BC[i] == 0:
+            # No Boundary Conditions
+            continue
+        
         else:
             # No Boundary Condition
             raise ValueError("Boundary Conditions are Incorrectly Defined")     

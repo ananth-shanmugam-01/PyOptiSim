@@ -1,7 +1,7 @@
 #%% Generic Optimal Control Sim
 
 # Model Physics
-import src.model.RocketLanding as RocketLanding
+import src.model.Track.TrackModel as TrackModel
 
 # Transcription
 import src.tools.OptiProblem as OptiProblem
@@ -23,7 +23,8 @@ s_opts = {"max_iter": 1000,
 
 #%% Generic Optimal Control Sim
 
-modelFun = RocketLanding.model.factory()
+trackDataFrame, sLap = TrackModel.model.loadTrack("src/model/Track/Catalunya.csv")
+modelFun = TrackModel.model.factory(trackDataFrame, sLap)
 
 optiProblem, Xs, Us, Gs = OptiProblem.createOptiProblem(modelFun)
 
@@ -34,7 +35,3 @@ sol = optiProblem.solve()
 #%% Assigning Values to Dict
 
 SimOut = SimOutputs.createOutputDict(optiProblem, modelFun, Xs, Us, Gs)
-
-#%% Plots
-
-RocketLanding.model.createResultPlots(SimOut)
