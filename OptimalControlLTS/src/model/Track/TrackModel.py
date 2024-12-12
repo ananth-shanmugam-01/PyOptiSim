@@ -114,16 +114,6 @@ class model:
         # plt.legend()
         # plt.title('Track Curvature Generation')
         # plt.show()
-        
-        # plt.plot( trackData["sLap"], trackData["theta"] * 180/3.14)
-        # plt.plot( trackData["sLap"], trackData["corrected_theta"]* 180/3.14)
-        # plt.xlabel("sLap [m]")
-        # plt.ylabel("theta [rad]")
-        # plt.title("Track Heading Angle")
-        # plt.grid()
-        # plt.legend(['theta', 'corrected_theta'])
-        # plt.show()        
-
 
     def createModelFunction(self):
 
@@ -131,21 +121,22 @@ class model:
         # addState(states, sym, name, der_name, scale, bounds, BC, BC_Vals, initialSolution):
         # BC - 0 - No BC, 1 - Initial Fixed, 2 - Final Fixed, 3 - continuity, 4 - Initial and Terminal Fixed
         curv = ca.SX.sym('curv')
-        self.states = DecisionVariables.addState(self.states, curv, 'curv', 'der_curv', 1, (-3, 3), 3, (10, 0), self.initialSolution["curv"] )
+        self.states = DecisionVariables.addState(self.states, curv, 'curv', 'der_curv', 1, (-3, 3), 3, (10, 0), self.initialSolution["curv"])
 
         theta = ca.SX.sym('theta')
-        self.states = DecisionVariables.addState(self.states, theta, 'theta', 'der_theta', 1, (-3*math.pi, 3*math.pi), 3, (10, 0), self.initialSolution["theta"] )
+        # self.initialSolution["theta"]
+        self.states = DecisionVariables.addState(self.states, theta, 'theta', 'der_theta', 1, (-3*3.14, 3*3.14), 3, (10, 0),  0 * np.ones(len(self.mesh_points)))
 
         xi = ca.SX.sym('xi')
-        self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 1, (-math.inf, math.inf), 0, (10, 0), self.initialSolution["x"] )
+        self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 1000, (-10000, 10000), 0, (10, 0), self.initialSolution["x"] )
         
         yi = ca.SX.sym('yi')
-        self.states = DecisionVariables.addState(self.states, yi, 'yi', 'der_yi', 1, (-math.inf, math.inf), 0, (10, 0), self.initialSolution["y"] )    
+        self.states = DecisionVariables.addState(self.states, yi, 'yi', 'der_yi', 1000, (-10000, 10000), 0, (10, 0), self.initialSolution["y"] )    
         
         # Controls
         u = ca.SX.sym('u')
         u_init = 0 * np.ones(len(self.mesh_points))
-        self.controls = DecisionVariables.addControl(self.controls, u, 'u',1, (-math.inf, math.inf), u_init)
+        self.controls = DecisionVariables.addControl(self.controls, u, 'u',10, (-100, 100), u_init)
         
         # Parameters       
         xc = ca.SX.sym('xc')
@@ -155,14 +146,14 @@ class model:
         self.parameters = DecisionVariables.addParameter(self.parameters, yc, 'yc', self.initialSolution["y"])
         
         # Assemble Model 
-        c = 2 # Smooth Factor
+        c = 100 # Smooth Factor
         
         # Model Dynamics
         rhs = ca.SX.sym('rhs', self.states.num_x)
         rhs[0] = u
         rhs[1] = curv
-        rhs[2] = math.cos(theta)
-        rhs[3] = math.sin(theta)
+        rhs[2] = ca.cos(theta)
+        rhs[3] = ca.sin(theta)
         
         # Model Penalties
         L = (xc - xi)**2 + (yc - yi)**2 + (c*u)**2
@@ -173,7 +164,7 @@ class model:
 
         modelFun = model()
         
-        numIntervals = 500 # Number of Phases
+        numIntervals = 300 # Number of Phases
         endPoint = sLap[-1]        
         
         modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
@@ -184,18 +175,13 @@ class model:
         return modelFun
     
     def createResultPlots(SimOut):
-
-        f, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True)
-        ax1.plot( SimOut.mesh , SimOut.states["velocity"], '-o')
-        ax1.set_title('Velocity Trajectory')
-
-        ax2.plot( SimOut.mesh , SimOut.states["mass"], '-o')
-        ax2.set_title('Mass State Trajectory')
-
-        ax3.plot( SimOut.mesh , SimOut.controls["thrust"], '-o')
-        ax3.set_title('Thrust Control Trajectory')
-
-        plt.show()
+        plt.plot( modelFun.initialSolution["x"], modelFun.initialSolution["y"])
+        plt.xlabel("sLap [m]")
+        plt.ylabel("theta [rad]")
+        plt.title("Track Heading Angle")
+        plt.grid()
+        plt.legend(['theta', 'corrected_theta'])
+        plt.show()   
 
     def unitTestModel():   
         
@@ -213,3 +199,31 @@ class model:
         print(cost)
         
         return modelFun
+
+# trackDataFrame, sLap = model.loadTrack("src/model/Track/Catalunya.csv")
+        
+# numIntervals = 500 # Number of Phases
+# endPoint = sLap[-1]    
+    
+# modelFun = model()
+
+# modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
+# modelFun.createMesh(endPoint, numIntervals)
+# modelFun.createInitialSolution(trackDataFrame)
+# modelFun.createModelFunction()
+ 
+# plt.plot( modelFun.initialSolution["x"], modelFun.initialSolution["y"])
+# plt.xlabel("sLap [m]")
+# plt.ylabel("theta [rad]")
+# plt.title("Track Heading Angle")
+# plt.grid()
+# plt.legend(['theta', 'corrected_theta'])
+# plt.show()        
+
+# plt.plot( modelFun.initialSolution["x"], modelFun.initialSolution["y"])
+# plt.xlabel("sLap [m]")
+# plt.ylabel("theta [rad]")
+# plt.title("Track Heading Angle")
+# plt.grid()
+# plt.legend(['theta', 'corrected_theta'])
+# plt.show()        

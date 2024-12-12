@@ -35,3 +35,40 @@ sol = optiProblem.solve()
 #%% Assigning Values to Dict
 
 SimOut = SimOutputs.createOutputDict(optiProblem, modelFun, Xs, Us, Gs)
+
+#%% Plots
+
+# plt.plot( SimOut.mesh, modelFun.initialSolution["curv"])
+# plt.plot( SimOut.mesh, SimOut.states["curv"])
+# plt.xlabel("sLap [m]")
+# plt.ylabel("Curvature [1/m]")
+# plt.title("Track Curvature")
+# plt.grid()
+# plt.legend(['Initial Solution', 'Optimal Solution'])
+# plt.show()        
+
+plt.plot( SimOut.mesh, SimOut.controls["u"])
+plt.xlabel("sLap [m]")
+plt.ylabel("heading [rad]")
+plt.title("Track Heading")
+plt.grid()
+plt.legend(['Initial Solution', 'Optimal Solution'])
+plt.show()     
+
+plt.plot( SimOut.mesh, modelFun.initialSolution["theta"])
+plt.plot( SimOut.mesh, SimOut.states["theta"])
+plt.xlabel("sLap [m]")
+plt.ylabel("heading [rad]")
+plt.title("Track Heading")
+plt.grid()
+plt.legend(['Initial Solution', 'Optimal Solution'])
+plt.show()     
+
+plt.plot( modelFun.initialSolution["x"], modelFun.initialSolution["y"])
+plt.plot( SimOut.states["xi"], SimOut.states["yi"])
+plt.xlabel("x_coordinate [m]")
+plt.ylabel("y_coordinate [m]")
+plt.title("Track Coordinates")
+plt.grid()
+plt.legend(['Initial Solution', 'Optimal Solution'])
+plt.show()       
