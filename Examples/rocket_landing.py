@@ -182,6 +182,8 @@ ax2.set_title('Mass State Trajectory')
 
 ax3.plot(remesh , u_opt, '-o')
 ax3.set_title('Thrust Control Trajectory')
+
+plt.show()
     
     
     
