@@ -12,6 +12,15 @@ import src.tools.SimOutputs as SimOutputs
 # For Visualisation
 import matplotlib.pyplot as plt
 
+# IPOPT Settings
+p_opts = {}
+s_opts = {"max_iter": 1000, 
+          "tol" : 1e-6,
+          "acceptable_tol": 1e-4,
+          "constr_viol_tol": 1e-3,
+          "compl_inf_tol": 1e-3,
+          "nlp_scaling_method": 'none'}
+
 #%% Generic Optimal Control Sim
 
 modelFun = RocketLanding.model.factory()
@@ -19,7 +28,7 @@ modelFun = RocketLanding.model.factory()
 optiProblem, Xs, Us, Gs = OptiProblem.createOptiProblem(modelFun)
 
 # Solve
-optiProblem.solver('ipopt')
+optiProblem.solver('ipopt',p_opts,s_opts)
 sol = optiProblem.solve() 
 
 #%% Assigning Values to Dict
