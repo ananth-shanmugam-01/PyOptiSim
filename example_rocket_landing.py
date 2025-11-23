@@ -1,7 +1,7 @@
 #%% Generic Optimal Control Sim
 
 # Model Physics
-import src.model.RocketLanding as RocketLanding
+from src.model.RocketLanding import RocketLanding
 
 # Transcription
 import src.tools.OptiProblem as OptiProblem
@@ -19,11 +19,11 @@ s_opts = {"max_iter": 1000,
           "acceptable_tol": 1e-4,
           "constr_viol_tol": 1e-3,
           "compl_inf_tol": 1e-3,
-          "nlp_scaling_method": 'none'}
+          "nlp_scaling_method": 'gradient-based',}
 
-#%% Generic Optimal Control Sim
+# Generic Optimal Control Sim
 
-modelFun = RocketLanding.model.factory()
+modelFun = RocketLanding.factory()
 
 optiProblem, Xs, Us, Gs = OptiProblem.createOptiProblem(modelFun)
 
@@ -31,10 +31,8 @@ optiProblem, Xs, Us, Gs = OptiProblem.createOptiProblem(modelFun)
 optiProblem.solver('ipopt',p_opts,s_opts)
 sol = optiProblem.solve() 
 
-#%% Assigning Values to Dict
-
+# Assigning Values to Dict
 SimOut = SimOutputs.createOutputDict(optiProblem, modelFun, Xs, Us, Gs)
 
-#%% Plots
-
-RocketLanding.model.createResultPlots(SimOut)
+# Plots
+RocketLanding.createResultPlots(SimOut)
