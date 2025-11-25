@@ -25,14 +25,13 @@ class BaseModel:
         self.mesh_points   = [] # equivalent to sLap
         
         # Decision Variables
-        self.states, self.controls, self.parameters = DecisionVariables.initialiseDecisionVariables()
+        self.states, self.controls, self.parameters, self.path_constraints, self.auxiliary_outputs = DecisionVariables.initialiseDecisionVariables()
         
         # Initial Solution
         self.initialSolution = dict()
 
         # Model Outputs
         self.cost         = []
-        self.path_constraints = []
         self.modelFunction    = []
                        
     def createLagrangeCoefficients(self, collocation_degree, collocation_strategy):

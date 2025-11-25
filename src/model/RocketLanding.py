@@ -71,10 +71,11 @@ class RocketLanding(BaseModel):
         rhs[0] = Sf * (g - thrust/mass)
         rhs[1] = Sf * (-c * thrust)
         
-        # Model Penalties
-        L = Sf
-        
-        self.modelFunction = ca.Function('f', [self.states.sym, self.controls.sym, self.parameters.sym], [rhs, L],['x', 'u', 'g'], ['rhs', 'L'])
+        # Stage Cost
+        cost = Sf
+
+        # Model Function
+        self.modelFunction = ca.Function('f', [self.states.sym, self.controls.sym, self.parameters.sym], [rhs, cost, self.path_constraints.sym, self.auxiliary_outputs.sym],['x', 'u', 'g'], ['rhs', 'cost', 'path_constraints', 'auxiliary_outputs'])
 
     def factory():
         

@@ -32,13 +32,30 @@ class parameter:
         self.value  = []
         self.num_g  = []
 
+class pathConstraint:
+    def __init__(self):
+        self.sym    = []
+        self.name   = []
+        self.scale  = []
+        self.lb     = []
+        self.ub     = []
+        self.num_path  = []
+
+class auxiliaryOutput:
+    def __init__(self):
+        self.sym    = []
+        self.name   = []
+        self.num_aux  = []
+
 def initialiseDecisionVariables():
     
     states = state()
     controls = control()
     parameters = parameter()
+    pathConstraints = pathConstraint()
+    auxiliaryOutputs = auxiliaryOutput()
 
-    return states, controls, parameters
+    return states, controls, parameters, pathConstraints, auxiliaryOutputs
 
 def addState(states, sym, name, der_name, scale, bounds, BC, BC_Vals, initialSolution):
     
@@ -85,15 +102,22 @@ def addParameter(parameters, sym, name, value):
     
     return parameters
 
-#%% Testing
+def addPathConstraint(pathConstraints, sym, name, scale, bounds):
+    
+    pathConstraints.sym      = ca.vertcat(pathConstraints.sym, sym)
+    pathConstraints.name     = np.append(pathConstraints.name, name)
+    pathConstraints.scale    = np.append(pathConstraints.scale, scale )
+    pathConstraints.lb       = np.append(pathConstraints.lb, bounds[0])
+    pathConstraints.ub       = np.append(pathConstraints.ub, bounds[1])
+    pathConstraints.num_path  = pathConstraints.sym.size(1)
+    
+    return pathConstraints
 
-# states, controls, parameters = initialiseDecisionVariables()   
-
-# velocity = ca.SX.sym('velocity')
-# velocity_init = np.linspace(0, 10, 12) 
-# states = addState(states, velocity, 'velocity', 'der_velocity', 1, (0, 100), 1, (10, 0), velocity_init)
-
-# mass     = ca.SX.sym('mass')
-# mass_init = np.ones(10) * 1 
-# states = addState(states, mass, 'mass', 'der_mass', 1, (0, 20), 1, (10, 0), mass_init)
+def addAuxiliaryOutput(auxiliaryOutputs, sym, name):
+    
+    auxiliaryOutputs.sym      = ca.vertcat(auxiliaryOutputs.sym, sym)
+    auxiliaryOutputs.name     = np.append(auxiliaryOutputs.name, name)
+    auxiliaryOutputs.num_aux  = auxiliaryOutputs.sym.size(1)
+    
+    return auxiliaryOutputs
  

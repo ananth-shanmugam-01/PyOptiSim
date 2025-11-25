@@ -11,26 +11,55 @@ def createOptiProblem(model):
     Us = []
     Gs = []
     
-    Xk = opti.variable( model.states.num_x )
-    Uk = opti.variable( model.controls.num_u )
+    # Multiply decision variables with their corresponding scales
+    Xk = opti.variable( model.states.num_x ) * model.states.scale
+    Uk = opti.variable( model.controls.num_u ) * model.controls.scale
     Gk = opti.parameter( model.parameters.num_g )
+
+    # Apply bounds to states and controls
+    # States
+    for i in range(model.states.num_x):
+        opti.subject_to( model.states.lb[i] / model.states.scale[i] <= Xk[i, :] / model.states.scale[i] )
+        opti.subject_to( Xk[i, :] / model.states.scale[i] <= model.states.ub[i] / model.states.scale[i] )
+
+    # Controls
+    for i in range( model.controls.num_u ):
+        opti.subject_to( model.controls.lb[i] / model.controls.scale[i] <= Uk[i, :] / model.controls.scale[i] )
+        opti.subject_to( Uk[i, :] / model.controls.scale[i] <= model.controls.ub[i] / model.controls.scale[i] )
     
     Xs = ca.horzcat(Xs, Xk ) 
     Us = ca.horzcat(Us, Uk ) 
     Gs = ca.horzcat(Gs, Gk ) 
     
-    
     for i in range( model.mesh_numIntervals ):
         
-        Xc = opti.variable( model.states.num_x, model.collocation_degree )
-        Uc = opti.variable( model.controls.num_u, model.collocation_degree )
+        Xc = opti.variable( model.states.num_x, model.collocation_degree ) * model.states.scale
+        Uc = opti.variable( model.controls.num_u, model.collocation_degree ) * model.controls.scale
         Gc = opti.parameter( model.parameters.num_g, model.collocation_degree )
         
+        # Apply bounds to states and controls
+        # States
+        for j in range(model.states.num_x):
+            opti.subject_to( model.states.lb[j] / model.states.scale[j] <= Xc[j, :] / model.states.scale[j])
+            opti.subject_to( Xc[j, :] / model.states.scale[j] <= model.states.ub[j] / model.states.scale[j])
+
+        # Controls
+        for j in range( model.controls.num_u ):
+            opti.subject_to( model.controls.lb[j] / model.controls.scale[j] <= Uc[j, :] / model.controls.scale[j] )
+            opti.subject_to( Uc[j,:] / model.controls.scale[j] <= model.controls.ub[j] / model.controls.scale[j])
+
         Xs = ca.horzcat(Xs, Xc ) 
         Us = ca.horzcat(Us, Uc ) 
         Gs = ca.horzcat(Gs, Gc ) 
         
-        rhs, L = model.modelFunction( Xc, Uc, Gc ) # Still need to bring in path constraints
+        rhs, L, path_constraints, _ = model.modelFunction(Xc, Uc, Gc)
+
+        # If path constraints is not an empty list
+        if path_constraints.size(1) > 0:
+            for j in range( model.path_constraints.num_path ):
+                # Path Constraint Bounds
+                opti.subject_to( model.path_constraints.lb[j] / model.path_constraints.scale[j] <= path_constraints[j,:] / model.path_constraints.scale[j] )
+                opti.subject_to( path_constraints[j,:] / model.path_constraints.scale[j] <= model.path_constraints.ub[j] / model.path_constraints.scale[j] )
         
         cost = cost + np.matmul( L , model.collocation_B * model.mesh_size )
         
@@ -48,12 +77,23 @@ def createOptiProblem(model):
         Xk_end = np.matmul( Z_s, model.collocation_D )
         Uk_end = np.matmul( Z_u, model.collocation_D )
         
-        Xk = opti.variable( model.states.num_x )
-        Uk = opti.variable( model.controls.num_u )
+        Xk = opti.variable( model.states.num_x ) * model.states.scale
+        Uk = opti.variable( model.controls.num_u ) * model.controls.scale
         Gk = opti.parameter( model.parameters.num_g )
     
         opti.subject_to( Xk_end == Xk )
         opti.subject_to( Uk_end == Uk)
+
+        # Apply bounds to states and controls
+        # States
+        for j in range(model.states.num_x):
+            opti.subject_to( model.states.lb[j] / model.states.scale[j] <= Xk[j,:] / model.states.scale[j] )
+            opti.subject_to( Xk[j,:] / model.states.scale[j] <= model.states.ub[j] / model.states.scale[j] )
+
+        # Controls
+        for j in range( model.controls.num_u ):
+            opti.subject_to( model.controls.lb[j] / model.controls.scale[j] <= Uk[j,:] / model.controls.scale[j] )
+            opti.subject_to( Uk[j,:] / model.controls.scale[j] <= model.controls.ub[j] / model.controls.scale[j] )
         
         Xs = ca.horzcat(Xs, Xk ) 
         Us = ca.horzcat(Us, Uk ) 
@@ -63,11 +103,7 @@ def createOptiProblem(model):
     
     # States
     for i in range(model.states.num_x):
-        
-        # State Bounds
-        opti.subject_to( model.states.lb[i] / model.states.scale[i] <= Xs[i,:] / model.states.scale[i])
-        opti.subject_to( Xs[i,:] / model.states.scale[i] <= model.states.ub[i] / model.states.scale[i])
-        
+
         # Initial Solution
         opti.set_initial( Xs[i,:], model.states.x_init[i] )
         
@@ -101,11 +137,6 @@ def createOptiProblem(model):
     
     # Controls
     for i in range( model.controls.num_u ):
-        
-        # Control Bounds
-        opti.subject_to( model.controls.lb[i] / model.controls.scale[i] <= Us[i,:] / model.controls.scale[i] )
-        opti.subject_to( Us[i,:] / model.controls.scale[i] <= model.controls.ub[i] / model.controls.scale[i])
-        
         # Initial Solution
         opti.set_initial( Us[i,:], model.controls.u_init[i] )
     
