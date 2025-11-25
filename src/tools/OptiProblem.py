@@ -82,7 +82,7 @@ def createOptiProblem(model):
         Gk = opti.parameter( model.parameters.num_g )
     
         opti.subject_to( Xk_end == Xk )
-        opti.subject_to( Uk_end == Uk)
+        opti.subject_to( Uk_end == Uk )
 
         # Apply bounds to states and controls
         # States

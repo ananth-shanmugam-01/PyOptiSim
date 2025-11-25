@@ -49,7 +49,6 @@ H_val = sol.value(H)
 plt.figure()
 plt.spy(H_val)
 plt.title("Hessian Sparsity Pattern")
-
 plt.show()
 
 # Assigning Values to Dict
