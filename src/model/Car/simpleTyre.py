@@ -1,19 +1,22 @@
 import numpy as np
 from math import atan, sin, pi
 
+# Plotting
+import matplotlib.pyplot as plt
+
 def tyreParameters():
     params = dict()
     params['tyre'] = dict()
-    params['tyre']['reference_load_1'] = 2000
-    params['tyre']['reference_load_2'] = 6000
-    params['tyre']['peak_mux_reference_load_1'] = 1.75
-    params['tyre']['peak_mux_reference_load_2'] = 1.40
+    params['tyre']['reference_load_1'] = 600
+    params['tyre']['reference_load_2'] = 1100
+    params['tyre']['peak_mux_reference_load_1'] = 1.53
+    params['tyre']['peak_mux_reference_load_2'] = 1.45
     params['tyre']['peak_mux_slip_load_1'] = 0.11
     params['tyre']['peak_mux_slip_load_2'] = 0.10
-    params['tyre']['peak_muy_reference_load_1'] = 1.80
-    params['tyre']['peak_muy_reference_load_2'] = 1.45
-    params['tyre']['peak_muy_slip_load_1'] = 9 # degrees
-    params['tyre']['peak_muy_slip_load_2'] = 8 # degrees
+    params['tyre']['peak_muy_reference_load_1'] = 1.65
+    params['tyre']['peak_muy_reference_load_2'] = 1.50
+    params['tyre']['peak_muy_slip_load_1'] = np.radians(9) # radians
+    params['tyre']['peak_muy_slip_load_2'] = np.radians(8) # radians
     params['tyre']['longitudinal_shape_factor'] = 1.9
     params['tyre']['lateral_shape_factor']  = 1.7
     return params
@@ -42,12 +45,12 @@ def simpleTyre(kappa: float, alpha: float, Fz: float, settings: dict):
     kappa_max = kappa_1 + (Fz - Fz1) * (kappa_2 - kappa_1)/(Fz2 - Fz1)
     alpha_max = alpha_1 + (Fz - Fz1) * (alpha_2 - alpha_1)/(Fz2 - Fz1)
 
-    kappa_norm = kappa/kappa_max
-    alpha_norm = alpha/alpha_max
+    kappa_norm = kappa/(kappa_max + 1e-3)
+    alpha_norm = alpha/(alpha_max + 1e-3)
 
     # Combined Slip Coefficient
 
-    rho = np.sqrt(alpha_norm**2 + kappa_norm**2 + 1e-3)
+    rho = np.sqrt(alpha_norm**2 + kappa_norm**2 + 0.0001)
 
     Sx = pi/(2*atan(Qx))
     Sy = pi/(2*atan(Qy))
@@ -64,12 +67,47 @@ if __name__ == "__main__":
 
     settings = tyreParameters()
 
-    Fz = 4000  # N
-    kappa = 0.05  # Longitudinal Slip
-    alpha = 5 * (pi/180)  # Slip Angle in Radians
+    Fz_sweep = [300, 600, 900, 1200]  # N
+    sweep_points = 100
 
-    Fy, Fx = simpleTyre(kappa, alpha, Fz, settings)
+    # Pure Longitudinal Slip Case
+    kappa_sweep = np.linspace(-0.2, 0.2, sweep_points)
 
-    print("Tyre Forces:")
-    print("Longitudinal Force Fx: ", Fx)
-    print("Lateral Force Fy: ", Fy)
+    #  Pure Lateral Slip Case
+    alpha_sweep = np.deg2rad( np.linspace(-15, 15, sweep_points) )  # radians
+
+    # Meshgrid of kappa and Fz
+    [KAPPA, FZ] = np.meshgrid(kappa_sweep, Fz_sweep)
+    [ALPHA, _] = np.meshgrid(alpha_sweep, Fz_sweep)
+
+    Fx_mesh = np.zeros(KAPPA.shape)
+    Fy_mesh = np.zeros(ALPHA.shape)
+
+    #  Calculate Lateral and Longitudinal Forces for each Fz
+    for i in range(FZ.shape[0]):
+        for j in range(KAPPA.shape[1]):
+            _, Fx = simpleTyre(KAPPA[i,j], 0.0, FZ[i,j], settings)
+            Fy, _ = simpleTyre(0.0, ALPHA[i,j], FZ[i,j], settings)
+            Fx_mesh[i,j] = Fx
+            Fy_mesh[i,j] = Fy
+
+    # Plotting on two subplots
+    plt.figure()
+    plt.subplot(1,2,1)
+    for i in range(Fz_sweep.__len__()):
+        plt.plot(kappa_sweep, Fx_mesh[i,:], label=f'Fz={Fz_sweep[i]} N')
+    plt.title('Tyre Longitudinal Force Fx vs Slip Ratio (kappa)')
+    plt.xlabel('Slip Ratio (kappa)')
+    plt.ylabel('Longitudinal Force Fx (N)')
+    plt.legend()
+    plt.grid()
+
+    plt.subplot(1,2,2)
+    for i in range(Fz_sweep.__len__()):
+        plt.plot(np.rad2deg(alpha_sweep), Fy_mesh[i,:], label=f'Fz={Fz_sweep[i]} N')
+    plt.title('Tyre Lateral Force Fy vs Slip Angle (alpha)')
+    plt.xlabel('Slip Angle (alpha) [degrees]')
+    plt.ylabel('Lateral Force Fy (N)')
+    plt.legend()
+    plt.grid()
+    plt.show()

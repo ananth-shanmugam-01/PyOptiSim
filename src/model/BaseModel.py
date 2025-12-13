@@ -23,6 +23,9 @@ class BaseModel:
         self.mesh_size = []
         self.mesh_numIntervals = []
         self.mesh_points   = [] # equivalent to sLap
+
+        # Settings
+        self.settings = dict()
         
         # Decision Variables
         self.states, self.controls, self.parameters, self.path_constraints, self.auxiliary_outputs = DecisionVariables.initialiseDecisionVariables()
