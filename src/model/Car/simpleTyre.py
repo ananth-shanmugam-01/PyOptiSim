@@ -1,5 +1,5 @@
 import numpy as np
-from math import atan, sin, pi
+import casadi as ca
 
 # Plotting
 import matplotlib.pyplot as plt
@@ -45,21 +45,21 @@ def simpleTyre(kappa: float, alpha: float, Fz: float, settings: dict):
     kappa_max = kappa_1 + (Fz - Fz1) * (kappa_2 - kappa_1)/(Fz2 - Fz1)
     alpha_max = alpha_1 + (Fz - Fz1) * (alpha_2 - alpha_1)/(Fz2 - Fz1)
 
-    kappa_norm = kappa/(kappa_max + 1e-3)
-    alpha_norm = alpha/(alpha_max + 1e-3)
+    kappa_norm = kappa/(kappa_max)
+    alpha_norm = alpha/(alpha_max)
 
     # Combined Slip Coefficient
 
-    rho = np.sqrt(alpha_norm**2 + kappa_norm**2 + 0.0001)
+    rho = ca.sqrt( (alpha_norm**2) + (kappa_norm**2) + 0.001 )
 
-    Sx = pi/(2*atan(Qx))
-    Sy = pi/(2*atan(Qy))
+    Sx = ca.pi/(2*ca.atan(Qx))
+    Sy = ca.pi/(2*ca.atan(Qy))
 
-    mux = mux_max * sin(Qx * atan(Sx * rho))
-    muy = muy_max * sin(Qy * atan(Sy * rho))
+    mux = mux_max * ca.sin(Qx * ca.atan(Sx * rho))
+    muy = muy_max * ca.sin(Qy * ca.atan(Sy * rho))
 
-    Fx = mux * Fz * kappa_norm/rho
-    Fy = -muy * Fz * alpha_norm/rho
+    Fx = mux * Fz * kappa_norm/(rho)
+    Fy = -muy * Fz * alpha_norm/(rho)
 
     return Fy, Fx
 

@@ -124,7 +124,7 @@ class CarModel(BaseModel):
         # Initial Solution for States
         initialSolution["n"] = np.zeros(len(self.mesh_points))
         initialSolution["xi"] = np.zeros(len(self.mesh_points))
-        initialSolution["u"] = 10 * np.ones(len(self.mesh_points)) # m/s
+        initialSolution["u"] = 5 * np.ones(len(self.mesh_points)) # m/s
         initialSolution["v"] = np.zeros(len(self.mesh_points)) # m/s
         initialSolution["dpsi"] = np.zeros(len(self.mesh_points)) # rad/s
         initialSolution["x_ir"] = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['xi'])(self.mesh_points) # m - track x-coordinates
@@ -152,46 +152,46 @@ class CarModel(BaseModel):
         # addState(states, sym, name, der_name, scale, bounds, BC, BC_Vals, initialSolution):
         # BC - 0 - No BC, 1 - Initial Fixed, 2 - Final Fixed, 3 - continuity, 4 - Initial and Terminal Fixed
         n = ca.SX.sym('n')
-        self.states = DecisionVariables.addState(self.states, n, 'n', 'der_n', 1, (-0.1, 0.1), 2, (0, 0), self.initialSolution["n"] )
+        self.states = DecisionVariables.addState(self.states, n, 'n', 'der_n', 1, (-0.1, 0.1), 3, (0, 0), self.initialSolution["n"] )
 
         xi = ca.SX.sym('xi') # Heading angle deviation (rad)
-        self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 2, (np.radians(-4), np.radians(4)), 0, (0, 0), self.initialSolution["xi"] )
+        self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 2, (np.radians(-4), np.radians(4)), 3, (0, 0), self.initialSolution["xi"] )
 
         u = ca.SX.sym('u')         # vehicle fixed x-velocity (m/s)
-        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, 150), 2, (0, 0), self.initialSolution["u"] )
+        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, 150), 0, (0, 0), self.initialSolution["u"] )
 
         v = ca.SX.sym('v')         # vehicle fixed y-velocity (m/s)
-        self.states = DecisionVariables.addState(self.states, v, 'v', 'accy', 10, (-1e2, 1e2), 2, (0, 0),  self.initialSolution["v"])
+        self.states = DecisionVariables.addState(self.states, v, 'v', 'accy', 10, (-1e2, 1e2), 3, (0, 0),  self.initialSolution["v"])
 
         dpsi = ca.SX.sym('dpsi')   # vehicle yaw rate (rad/s)
-        self.states = DecisionVariables.addState(self.states, dpsi, 'dpsi', 'der_dpsi', 10, (-1e3, 1e3), 2, (0, 0), self.initialSolution["dpsi"]) 
+        self.states = DecisionVariables.addState(self.states, dpsi, 'dpsi', 'der_dpsi', 10, (-1e3, 1e3), 3, (0, 0), self.initialSolution["dpsi"]) 
 
         x_ir = ca.SX.sym('x_ir')   # x-Position in global coordinates (m)
-        self.states = DecisionVariables.addState(self.states, x_ir, 'x_ir', 'der_x_ir', 100, (-20000, 20000), 1, (0,  0), self.initialSolution["x_ir"]) 
+        self.states = DecisionVariables.addState(self.states, x_ir, 'x_ir', 'der_x_ir', 100, (-20000, 20000), 0, (self.settings['track']['xi'][0],  self.settings['track']['xi'][-1]), self.initialSolution["x_ir"]) 
 
         y_ir = ca.SX.sym('y_ir')   # y-Position in global coordinates (m)
-        self.states = DecisionVariables.addState(self.states, y_ir, 'y_ir', 'der_y_ir', 100, (-20000, 20000), 1, (0, 0), self.initialSolution["y_ir"])     
+        self.states = DecisionVariables.addState(self.states, y_ir, 'y_ir', 'der_y_ir', 100, (-20000, 20000), 0, (self.settings['track']['yi'][0],  self.settings['track']['yi'][-1]), self.initialSolution["y_ir"])     
         
         psi = ca.SX.sym('psi')     # yaw angle (rad)
-        self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 1, (-200, 200), 1, (0, 0),  self.initialSolution["psi"])     
+        self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 1, (-200, 200), 0, (0, 0),  self.initialSolution["psi"])     
 
         delta = ca.SX.sym('delta')  # steering angle (rad)
-        self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-30), np.radians(30)), 2, (0, 0),  self.initialSolution["delta"])     
+        self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-30), np.radians(30)), 3, (0, 0),  self.initialSolution["delta"])     
 
         Sxf = ca.SX.sym('Sxf')      # front long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxf, 'Sxf', 'der_Sxf', 1, (-0.15, 0.15), 2, (0, 0),  self.initialSolution["Sxf"]) 
+        self.states = DecisionVariables.addState(self.states, Sxf, 'Sxf', 'der_Sxf', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxf"]) 
 
         Sxr = ca.SX.sym('Sxr')      # rear long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxr, 'Sxr', 'der_Sxr', 1, (-0.15, 0.15), 2, (0, 0),  self.initialSolution["Sxr"]) 
+        self.states = DecisionVariables.addState(self.states, Sxr, 'Sxr', 'der_Sxr', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxr"]) 
 
         acc_x = ca.SX.sym('acc_x') # longitudinal acceleration (m/s^2)
-        self.states = DecisionVariables.addState(self.states, acc_x, 'acc_x', 'der_acc_x', 1e2, (-100, 100), 2, (0, 0),  self.initialSolution["acc_x"]) 
+        self.states = DecisionVariables.addState(self.states, acc_x, 'acc_x', 'der_acc_x', 1e2, (-100, 100), 0, (0, 0),  self.initialSolution["acc_x"]) 
 
         acc_y = ca.SX.sym('acc_y') # lateral acceleration (m/s^2)
-        self.states = DecisionVariables.addState(self.states, acc_y, 'acc_y', 'der_acc_y', 1e2, (-100, 100), 2, (0, 0),  self.initialSolution["acc_y"]) 
+        self.states = DecisionVariables.addState(self.states, acc_y, 'acc_y', 'der_acc_y', 1e2, (-100, 100), 0, (0, 0),  self.initialSolution["acc_y"]) 
 
         pmguk = ca.SX.sym('pmguk') # MGUK Deploy Power at the Wheel (W)
-        self.states = DecisionVariables.addState(self.states, pmguk, 'pmguk', 'der_pmguk', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], self.settings['powertrain']['PMGUKDeployMax']), 2, (0, 0), self.initialSolution["pmguk"]) 
+        self.states = DecisionVariables.addState(self.states, pmguk, 'pmguk', 'der_pmguk', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], self.settings['powertrain']['PMGUKDeployMax']), 0, (0, 0), self.initialSolution["pmguk"]) 
 
         # EESS = ca.SX.sym('EESS') # Battery State of Charge (J)
         # self.states = DecisionVariables.addState(self.states, EESS, 'EESS', 'pmguk', 1e6, (0, self.settings['powertrain']['EESSCapacity']), 1, (0, 0),  self.initialSolution["EESS"]) 
@@ -225,11 +225,21 @@ class CarModel(BaseModel):
         alpha_rl = ca.atan2( ( (v - self.settings['chassis']['rearLeverArm'] * dpsi) ) , u + 0.5 * self.settings['chassis']['halfTrackWidthRear'] )
         alpha_rr = ca.atan2( ( (v - self.settings['chassis']['rearLeverArm'] * dpsi) ) , u - 0.5 * self.settings['chassis']['halfTrackWidthRear'] )
 
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fl, 'alpha_fl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fr, 'alpha_fr')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rl, 'alpha_rl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rr, 'alpha_rr')
+
         # Wheel Longitudinal Slips
         kappa_fl = Sxf
         kappa_fr = Sxf
         kappa_rl = Sxr
         kappa_rr = Sxr
+
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fl, 'kappa_fl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fr, 'kappa_fr')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_rl, 'kappa_rl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_rr, 'kappa_rr')
 
         # Wheel Loads - Static Load + Aero Load + Longitudinal Load Transfer + Lateral Load Transfer
         Fz_fl = ( 0.5 * self.settings['chassis']['mass'] * self.settings['chassis']['weightDistribution'] * 9.81 ) + ( 0.5 * Flf ) + (-0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_x / self.settings['chassis']['wheelbase'] ) - ( self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_y * self.settings['chassis']['rollStiffnessDistribution'] / self.settings['chassis']['trackWidthFront'] )
@@ -237,11 +247,25 @@ class CarModel(BaseModel):
         Fz_rl = ( 0.5 * self.settings['chassis']['mass'] * (1-self.settings['chassis']['weightDistribution']) * 9.81 ) + ( 0.5 * Flr ) + (0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_x / self.settings['chassis']['wheelbase'] ) - ( self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_y * (1-self.settings['chassis']['rollStiffnessDistribution']) / self.settings['chassis']['trackWidthRear'] )
         Fz_rr = ( 0.5 * self.settings['chassis']['mass'] * (1-self.settings['chassis']['weightDistribution']) * 9.81 ) + ( 0.5 * Flr ) + (0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_x / self.settings['chassis']['wheelbase'] ) + ( self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_y * (1-self.settings['chassis']['rollStiffnessDistribution']) / self.settings['chassis']['trackWidthRear'] )
      
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_fl, 'Fz_fl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_fr, 'Fz_fr')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_rl, 'Fz_rl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_rr, 'Fz_rr')
+
         # Tyre Forces in Wheel Frame
         Fy_fl, Fx_fl = simpleTyre( kappa_fl, alpha_fl, Fz_fl, self.settings )
         Fy_fr, Fx_fr = simpleTyre( kappa_fr, alpha_fr, Fz_fr, self.settings )
         Fy_rl, Fx_rl = simpleTyre( kappa_rl, alpha_rl, Fz_rl, self.settings )
         Fy_rr, Fx_rr = simpleTyre( kappa_rr, alpha_rr, Fz_rr, self.settings )
+
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_fl, 'Fx_fl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_fr, 'Fx_fr')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_rl, 'Fx_rl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_rr, 'Fx_rr')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_fl, 'Fy_fl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_fr, 'Fy_fr')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_rl, 'Fy_rl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_rr, 'Fy_rr')
 
         # Tyre Forces in Vehicle Frame
         Fx = ca.cos(delta) * (Fx_fl + Fx_fr) - ca.sin(delta) * (Fy_fl + Fy_fr) + Fx_rl + Fx_rr + Fd
@@ -267,10 +291,10 @@ class CarModel(BaseModel):
         der_psi = dpsi
         power_wheel = (Fx-Fd) * u # Remove Drag from power at wheel calculation
 
-        # # Power at Wheel Constraint
-        # power_constraint = power_wheel - pmguk
-        # # Model Path Constraints
-        # self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e4, (-100e3, 0) )
+        # Power at Wheel Constraint
+        power_constraint = power_wheel - pmguk
+        # Model Path Constraints
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e4, (-100e3, 0) )
 
         # Model Dynamics
         rhs = ca.SX.sym('rhs', self.states.num_x)
@@ -291,12 +315,12 @@ class CarModel(BaseModel):
         # rhs[14] = Sf * -pmguk 
 
         # Stage Cost
-        cost = ( Sf )
-        #         + ( 0.01 * der_delta**2 ) 
-        #         + ( 0.005 * der_Sxf**2 ) 
-        #         + ( 0.005 * der_Sxr**2 )
-        #         + ( 1e-9 * der_pmguk**2 )
-        # )
+        cost = ( Sf
+                + ( 0.01 * der_delta**2 ) 
+                + ( 0.005 * der_Sxf**2 ) 
+                + ( 0.005 * der_Sxr**2 )
+                + ( 1e-9 * der_pmguk**2 )
+            )
 
         # Model Function
         self.modelFunction = ca.Function('f', [self.states.sym, self.controls.sym, self.parameters.sym], [rhs, cost, self.path_constraints.sym, self.auxiliary_outputs.sym],['x', 'u', 'g'], ['rhs', 'cost', 'path_constraints', 'auxiliary_outputs'])
@@ -370,32 +394,47 @@ if __name__ == "__main__":
 
         # print("Checking for NaNs in Initial Guess:")
         # for key, value in modelFun.initialSolution.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) & np.any(np.isinf(value))}")
+        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
 
         # print("Checking for NaNs in Decision Variables:")
         # for key, value in SimOut.states.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) & np.any(np.isinf(value))}")
+        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
 
         # for key, value in SimOut.controls.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) & np.any(np.isinf(value))}")
+        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
 
         # for key, value in SimOut.parameters.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) & np.any(np.isinf(value))}")
+        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
 
         # # Check for infeasibilities in dynamics
         # print("Checking for infeasibilities in Dynamics:")
         # for key, value in SimOut.der_states.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) & np.any(np.isinf(value))}")
+        #     if np.any(np.isnan(value)) | np.any(np.isinf(value)):
+        #         print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
+        #         print(f"Values: {value}")
 
         # # Check for infeasibilities in path constraints
         # print("Checking for infeasibilities in Path Constraints:")
         # for key, value in SimOut.path_constraints.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) & np.any(np.isinf(value))}")
+        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
 
         # # Check for Infeasibilities in cost
         # print("Checking for infeasibilities in Cost:")
-        # print(f"Cost: NaN or Inf detected? {np.any(np.isnan(SimOut.cost)) & np.any(np.isinf(SimOut.cost))}")
+        # print(f"Cost: NaN or Inf detected? {np.any(np.isnan(SimOut.cost)) | np.any(np.isinf(SimOut.cost))}")
 
+        # Check for infeasibilities in auxiliary outputs
+        print("Checking for infeasibilities in Auxiliary Outputs:")
+        for key, value in SimOut.auxiliary_outputs.items():
+            print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
+            print(f"Values: {value}")
 
+        # Simple Tyre Testings
+        Fz = SimOut.auxiliary_outputs['Fz_fl']
+        kappa = SimOut.auxiliary_outputs['kappa_fl']
+        alpha = SimOut.auxiliary_outputs['alpha_fl']
+        Fy, Fx = simpleTyre( kappa, alpha, Fz, modelFun.settings )
+        print("Tyre Forces Computed:")
+        print(f"Fx: {Fx}")
+        print(f"Fy: {Fy}")
 
-
+    # # Create Result Plots
