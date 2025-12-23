@@ -15,6 +15,9 @@ import src.tools.OptiProblem as OptiProblem
 # Post Processing
 import src.tools.SimOutputs as SimOutputs
 
+# Sim Debugging
+from src.tools.DebugSim import DebugSim
+
 class CarModel(BaseModel):
 
     def loadTrackData(self, trackFile: str):
@@ -155,7 +158,7 @@ class CarModel(BaseModel):
         self.states = DecisionVariables.addState(self.states, n, 'n', 'der_n', 1, (-0.1, 0.1), 3, (0, 0), self.initialSolution["n"] )
 
         xi = ca.SX.sym('xi') # Heading angle deviation (rad)
-        self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 2, (np.radians(-4), np.radians(4)), 3, (0, 0), self.initialSolution["xi"] )
+        self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 1, (np.radians(-4), np.radians(4)), 3, (0, 0), self.initialSolution["xi"] )
 
         u = ca.SX.sym('u')         # vehicle fixed x-velocity (m/s)
         self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, 150), 0, (0, 0), self.initialSolution["u"] )
@@ -294,7 +297,7 @@ class CarModel(BaseModel):
         # Power at Wheel Constraint
         power_constraint = power_wheel - pmguk
         # Model Path Constraints
-        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e4, (-100e3, 0) )
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e4, (-np.inf, 0) )
 
         # Model Dynamics
         rhs = ca.SX.sym('rhs', self.states.num_x)
@@ -382,59 +385,4 @@ if __name__ == "__main__":
         print("Solver failed. Debugging variable values...")
         SimOut = SimOutputs.createDebugOutputDict(optiProblem, modelFun, Xs, Us, Gs)
 
-        # # Create subplot for the number of states
-        # plt.subplots(nrows=modelFun.states.num_x, ncols=1, figsize=(10, 2*modelFun.states.num_x))
-        # for i in range(modelFun.states.num_x):
-        #     plt.subplot(modelFun.states.num_x, 1, i+1)
-        #     plt.plot(SimOut.mesh, SimOut.states[modelFun.states.name[i]])
-        #     plt.title(f'State: {modelFun.states.name[i]}')
-        #     plt.xlabel('Mesh [m]')
-        #     plt.ylabel(modelFun.states.name[i])
-        # plt.show()
-
-        # print("Checking for NaNs in Initial Guess:")
-        # for key, value in modelFun.initialSolution.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
-
-        # print("Checking for NaNs in Decision Variables:")
-        # for key, value in SimOut.states.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
-
-        # for key, value in SimOut.controls.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
-
-        # for key, value in SimOut.parameters.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
-
-        # # Check for infeasibilities in dynamics
-        # print("Checking for infeasibilities in Dynamics:")
-        # for key, value in SimOut.der_states.items():
-        #     if np.any(np.isnan(value)) | np.any(np.isinf(value)):
-        #         print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
-        #         print(f"Values: {value}")
-
-        # # Check for infeasibilities in path constraints
-        # print("Checking for infeasibilities in Path Constraints:")
-        # for key, value in SimOut.path_constraints.items():
-        #     print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
-
-        # # Check for Infeasibilities in cost
-        # print("Checking for infeasibilities in Cost:")
-        # print(f"Cost: NaN or Inf detected? {np.any(np.isnan(SimOut.cost)) | np.any(np.isinf(SimOut.cost))}")
-
-        # Check for infeasibilities in auxiliary outputs
-        print("Checking for infeasibilities in Auxiliary Outputs:")
-        for key, value in SimOut.auxiliary_outputs.items():
-            print(f"{key}: NaN or Inf detected? {np.any(np.isnan(value)) | np.any(np.isinf(value))}")
-            print(f"Values: {value}")
-
-        # Simple Tyre Testings
-        Fz = SimOut.auxiliary_outputs['Fz_fl']
-        kappa = SimOut.auxiliary_outputs['kappa_fl']
-        alpha = SimOut.auxiliary_outputs['alpha_fl']
-        Fy, Fx = simpleTyre( kappa, alpha, Fz, modelFun.settings )
-        print("Tyre Forces Computed:")
-        print(f"Fx: {Fx}")
-        print(f"Fy: {Fy}")
-
-    # # Create Result Plots
+        DebugSim(modelFun, SimOut)
