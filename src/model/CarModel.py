@@ -155,19 +155,19 @@ class CarModel(BaseModel):
         # addState(states, sym, name, der_name, scale, bounds, BC, BC_Vals, initialSolution):
         # BC - 0 - No BC, 1 - Initial Fixed, 2 - Final Fixed, 3 - continuity, 4 - Initial and Terminal Fixed
         n = ca.SX.sym('n')
-        self.states = DecisionVariables.addState(self.states, n, 'n', 'der_n', 1, (-0.1, 0.1), 0, (0, 0), self.initialSolution["n"] )
+        self.states = DecisionVariables.addState(self.states, n, 'n', 'der_n', 1, (-0.1, 0.1), 3, (0, 0), self.initialSolution["n"] )
 
         xi = ca.SX.sym('xi') # Heading angle deviation (rad)
         self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 1, (np.radians(-4), np.radians(4)), 3, (0, 0), self.initialSolution["xi"] )
 
         u = ca.SX.sym('u')         # vehicle fixed x-velocity (m/s)
-        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, 150), 1, (10, 0), self.initialSolution["u"] )
+        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, 150), 3, (10, 0), self.initialSolution["u"] )
 
         v = ca.SX.sym('v')         # vehicle fixed y-velocity (m/s)
-        self.states = DecisionVariables.addState(self.states, v, 'v', 'accy', 10, (-1e2, 1e2), 0, (0, 0),  self.initialSolution["v"])
+        self.states = DecisionVariables.addState(self.states, v, 'v', 'accy', 10, (-1e2, 1e2), 3, (0, 0),  self.initialSolution["v"])
 
         dpsi = ca.SX.sym('dpsi')   # vehicle yaw rate (rad/s)
-        self.states = DecisionVariables.addState(self.states, dpsi, 'dpsi', 'der_dpsi', 10, (-1e3, 1e3), 0, (0, 0), self.initialSolution["dpsi"]) 
+        self.states = DecisionVariables.addState(self.states, dpsi, 'dpsi', 'der_dpsi', 10, (-1e3, 1e3), 3, (0, 0), self.initialSolution["dpsi"]) 
 
         x_ir = ca.SX.sym('x_ir')   # x-Position in global coordinates (m)
         self.states = DecisionVariables.addState(self.states, x_ir, 'x_ir', 'der_x_ir', 100, (-20000, 20000), 0, (self.settings['track']['xi'][0],  self.settings['track']['xi'][-1]), self.initialSolution["x_ir"]) 
@@ -179,13 +179,13 @@ class CarModel(BaseModel):
         self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 1, (-200, 200), 0, (0, 0),  self.initialSolution["psi"])     
 
         delta = ca.SX.sym('delta')  # steering angle (rad)
-        self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-30), np.radians(30)), 0, (0, 0),  self.initialSolution["delta"])     
+        self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-30), np.radians(30)), 3, (0, 0),  self.initialSolution["delta"])     
 
         Sxf = ca.SX.sym('Sxf')      # front long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxf, 'Sxf', 'der_Sxf', 1, (-0.15, 0.15), 0, (0, 0),  self.initialSolution["Sxf"]) 
+        self.states = DecisionVariables.addState(self.states, Sxf, 'Sxf', 'der_Sxf', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxf"]) 
 
         Sxr = ca.SX.sym('Sxr')      # rear long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxr, 'Sxr', 'der_Sxr', 1, (-0.15, 0.15), 0, (0, 0),  self.initialSolution["Sxr"]) 
+        self.states = DecisionVariables.addState(self.states, Sxr, 'Sxr', 'der_Sxr', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxr"]) 
 
         acc_x = ca.SX.sym('acc_x') # longitudinal acceleration (m/s^2)
         self.states = DecisionVariables.addState(self.states, acc_x, 'acc_x', 'der_acc_x', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_x"]) 
@@ -330,17 +330,22 @@ class CarModel(BaseModel):
 
     def factory():
         
-        # Test Track
-        step_length = 1
-        straight = 20
-        turn_length = 50
-        min_radius = 8
-
         modelFun = CarModel()
-        modelFun.createSimpleTrack(step_length, straight, turn_length, min_radius)
-        endPoint = modelFun.settings['track']['sLap'][-1]
 
-        numIntervals = 50 # Number of Phases
+        # # Test Track
+        # step_length = 1
+        # straight = 20
+        # turn_length = 50
+        # min_radius = 8
+        # modelFun.createSimpleTrack(step_length, straight, turn_length, min_radius)
+        # endPoint = modelFun.settings['track']['sLap'][-1]
+        # numIntervals = 50 # Number of Phases
+
+        # # FSUK Track
+        trackFile = 'src/model/Car/dataFiles/FSUK_2023_processed.csv'
+        modelFun.loadTrackData(trackFile)
+        endPoint = modelFun.settings['track']['sLap'][-1]
+        numIntervals = 200 # Number of Phases
 
         modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
         modelFun.createMesh(endPoint, numIntervals)
