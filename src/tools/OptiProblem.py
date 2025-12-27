@@ -19,14 +19,12 @@ def createOptiProblem(model):
     # Apply bounds to states and controls
     # States
     for i in range(model.states.num_x):
-        opti.subject_to( model.states.lb[i] / model.states.scale[i] <= Xk[i, :] / model.states.scale[i] )
-        opti.subject_to( Xk[i, :] / model.states.scale[i] <= model.states.ub[i] / model.states.scale[i] )
+        opti.subject_to ( opti.bounded(model.states.lb[i] / model.states.scale[i], Xk[i, :] / model.states.scale[i], model.states.ub[i] / model.states.scale[i]) )
 
     # Controls
     for i in range( model.controls.num_u ):
-        opti.subject_to( model.controls.lb[i] / model.controls.scale[i] <= Uk[i, :] / model.controls.scale[i] )
-        opti.subject_to( Uk[i, :] / model.controls.scale[i] <= model.controls.ub[i] / model.controls.scale[i] )
-    
+        opti.subject_to ( opti.bounded(model.controls.lb[i] / model.controls.scale[i], Uk[i, :] / model.controls.scale[i], model.controls.ub[i] / model.controls.scale[i]) )
+
     Xs = ca.horzcat(Xs, Xk ) 
     Us = ca.horzcat(Us, Uk ) 
     Gs = ca.horzcat(Gs, Gk ) 
@@ -40,13 +38,11 @@ def createOptiProblem(model):
         # Apply bounds to states and controls
         # States
         for j in range(model.states.num_x):
-            opti.subject_to( model.states.lb[j] / model.states.scale[j] <= Xc[j, :] / model.states.scale[j])
-            opti.subject_to( Xc[j, :] / model.states.scale[j] <= model.states.ub[j] / model.states.scale[j])
+            opti.subject_to( opti.bounded( model.states.lb[j] / model.states.scale[j], Xc[j, :] / model.states.scale[j], model.states.ub[j] / model.states.scale[j]) )
 
         # Controls
         for j in range( model.controls.num_u ):
-            opti.subject_to( model.controls.lb[j] / model.controls.scale[j] <= Uc[j, :] / model.controls.scale[j] )
-            opti.subject_to( Uc[j,:] / model.controls.scale[j] <= model.controls.ub[j] / model.controls.scale[j])
+            opti.subject_to( opti.bounded( model.controls.lb[j] / model.controls.scale[j], Uc[j, :] / model.controls.scale[j], model.controls.ub[j] / model.controls.scale[j]) )
 
         Xs = ca.horzcat(Xs, Xc ) 
         Us = ca.horzcat(Us, Uc ) 
@@ -58,8 +54,7 @@ def createOptiProblem(model):
         if path_constraints.size(1) > 0:
             for j in range( model.path_constraints.num_path ):
                 # Path Constraint Bounds
-                opti.subject_to( model.path_constraints.lb[j] / model.path_constraints.scale[j] <= path_constraints[j,:] / model.path_constraints.scale[j] )
-                opti.subject_to( path_constraints[j,:] / model.path_constraints.scale[j] <= model.path_constraints.ub[j] / model.path_constraints.scale[j] )
+                opti.subject_to ( opti.bounded( model.path_constraints.lb[j] / model.path_constraints.scale[j], path_constraints[j,:] / model.path_constraints.scale[j], model.path_constraints.ub[j] / model.path_constraints.scale[j]) )
         
         cost = cost + np.matmul( L , model.collocation_B * model.mesh_size )
         
@@ -91,14 +86,12 @@ def createOptiProblem(model):
         # Apply bounds to states and controls
         # States
         for j in range(model.states.num_x):
-            opti.subject_to( model.states.lb[j] / model.states.scale[j] <= Xk[j,:] / model.states.scale[j] )
-            opti.subject_to( Xk[j,:] / model.states.scale[j] <= model.states.ub[j] / model.states.scale[j] )
+            opti.subject_to( opti.bounded( model.states.lb[j] / model.states.scale[j], Xk[j,:] / model.states.scale[j], model.states.ub[j] / model.states.scale[j]) )
 
         # Controls
         for j in range( model.controls.num_u ):
-            opti.subject_to( model.controls.lb[j] / model.controls.scale[j] <= Uk[j,:] / model.controls.scale[j] )
-            opti.subject_to( Uk[j,:] / model.controls.scale[j] <= model.controls.ub[j] / model.controls.scale[j] )
-        
+            opti.subject_to( opti.bounded( model.controls.lb[j] / model.controls.scale[j], Uk[j,:] / model.controls.scale[j], model.controls.ub[j] / model.controls.scale[j]) )
+
         Xs = ca.horzcat(Xs, Xk ) 
         Us = ca.horzcat(Us, Uk ) 
         Gs = ca.horzcat(Gs, Gk ) 

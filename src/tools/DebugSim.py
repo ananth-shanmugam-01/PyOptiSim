@@ -18,7 +18,7 @@ def DebugSim(modelFun, SimOut):
     num_cols = 2
     num_rows = int(np.ceil(num_states / num_cols))
 
-    fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, constrained_layout=True)
+    fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols)
 
     # Ensure axs is a 2D numpy array indexed as [row, col]
     axs = np.array(axs).reshape(num_rows, num_cols)
