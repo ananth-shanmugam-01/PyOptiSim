@@ -297,7 +297,7 @@ class CarModel(BaseModel):
         # Power at Wheel Constraint
         power_constraint = power_wheel - self.settings['powertrain']['PMGUKDeployMax']
         # Model Path Constraints
-        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e4, (-np.inf, 0) )
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (-np.inf, 0) )
 
         # Model Dynamics
         rhs = ca.SX.sym('rhs', self.states.num_x)

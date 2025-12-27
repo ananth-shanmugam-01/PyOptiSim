@@ -80,9 +80,13 @@ def createOptiProblem(model):
         Xk = opti.variable( model.states.num_x ) * model.states.scale
         Uk = opti.variable( model.controls.num_u ) * model.controls.scale
         Gk = opti.parameter( model.parameters.num_g )
-    
-        opti.subject_to( Xk_end == Xk )
-        opti.subject_to( Uk_end == Uk )
+
+        # Continuity Constraints
+        for ii in range(model.states.num_x):
+            opti.subject_to( Xk_end[ii] / model.states.scale[ii] == Xk[ii] / model.states.scale[ii] )
+
+        for ii in range(model.controls.num_u):
+            opti.subject_to( Uk_end[ii] / model.controls.scale[ii] == Uk[ii] / model.controls.scale[ii] )
 
         # Apply bounds to states and controls
         # States
