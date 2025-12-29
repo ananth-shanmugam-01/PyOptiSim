@@ -125,6 +125,7 @@ class CarModel(BaseModel):
         initialSolution = dict()
 
         # Initial Solution for States
+        initialSolution["t"] = np.linspace(0, 100, len(self.mesh_points)) # s
         initialSolution["n"] = np.zeros(len(self.mesh_points))
         initialSolution["xi"] = np.zeros(len(self.mesh_points))
         initialSolution["u"] = 5 * np.ones(len(self.mesh_points)) # m/s
@@ -154,6 +155,9 @@ class CarModel(BaseModel):
         # States
         # addState(states, sym, name, der_name, scale, bounds, BC, BC_Vals, initialSolution):
         # BC - 0 - No BC, 1 - Initial Fixed, 2 - Final Fixed, 3 - continuity, 4 - Initial and Terminal Fixed
+        t = ca.SX.sym('t')     # time (s)
+        self.states = DecisionVariables.addState(self.states, t, 't', 'der_t', 100, (0, 1e3), 1, (0, 0), self.initialSolution["t"] )
+
         n = ca.SX.sym('n')
         self.states = DecisionVariables.addState(self.states, n, 'n', 'der_n', 1, (-0.1, 0.1), 3, (0, 0), self.initialSolution["n"] )
 
@@ -181,11 +185,17 @@ class CarModel(BaseModel):
         delta = ca.SX.sym('delta')  # steering angle (rad)
         self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-30), np.radians(30)), 3, (0, 0),  self.initialSolution["delta"])     
 
-        Sxf = ca.SX.sym('Sxf')      # front long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxf, 'Sxf', 'der_Sxf', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxf"]) 
+        Sxfl = ca.SX.sym('Sxfl')      # front left long. slip (-)
+        self.states = DecisionVariables.addState(self.states, Sxfl, 'Sxfl', 'der_Sxfl', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxf"]) 
+        
+        Sxfr = ca.SX.sym('Sxfr')      # front right long. slip (-)
+        self.states = DecisionVariables.addState(self.states, Sxfr, 'Sxfr', 'der_Sxfr', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxf"]) 
 
-        Sxr = ca.SX.sym('Sxr')      # rear long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxr, 'Sxr', 'der_Sxr', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxr"]) 
+        Sxrl = ca.SX.sym('Sxrl')      # rear left long. slip (-)
+        self.states = DecisionVariables.addState(self.states, Sxrl, 'Sxrl', 'der_Sxrl', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxr"]) 
+
+        Sxrr = ca.SX.sym('Sxrr')      # rear right long. slip (-)
+        self.states = DecisionVariables.addState(self.states, Sxrr, 'Sxrr', 'der_Sxrr', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxr"]) 
 
         acc_x = ca.SX.sym('acc_x') # longitudinal acceleration (m/s^2)
         self.states = DecisionVariables.addState(self.states, acc_x, 'acc_x', 'der_acc_x', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_x"]) 
@@ -203,11 +213,17 @@ class CarModel(BaseModel):
         der_delta = ca.SX.sym('der_delta')
         self.controls = DecisionVariables.addControl(self.controls, der_delta, 'der_delta', 1, (-10, 10), self.initialSolution["der_delta"])
 
-        der_Sxf = ca.SX.sym('der_Sxf')
-        self.controls = DecisionVariables.addControl(self.controls, der_Sxf, 'der_Sxf', 1, (-10, 10), self.initialSolution["der_Sxf"])
+        der_Sxfl = ca.SX.sym('der_Sxfl')
+        self.controls = DecisionVariables.addControl(self.controls, der_Sxfl, 'der_Sxfl', 1, (-10, 10), self.initialSolution["der_Sxf"])
 
-        der_Sxr = ca.SX.sym('der_Sxr')
-        self.controls = DecisionVariables.addControl(self.controls, der_Sxr, 'der_Sxr', 1, (-10, 10), self.initialSolution["der_Sxr"])
+        der_Sxfr = ca.SX.sym('der_Sxfr')
+        self.controls = DecisionVariables.addControl(self.controls, der_Sxfr, 'der_Sxfr', 1, (-10, 10), self.initialSolution["der_Sxf"])
+
+        der_Sxrl = ca.SX.sym('der_Sxrl')
+        self.controls = DecisionVariables.addControl(self.controls, der_Sxrl, 'der_Sxrl', 1, (-10, 10), self.initialSolution["der_Sxr"])
+
+        der_Sxrr = ca.SX.sym('der_Sxrr')
+        self.controls = DecisionVariables.addControl(self.controls, der_Sxrr, 'der_Sxrr', 1, (-10, 10), self.initialSolution["der_Sxr"])
 
         # der_pmguk = ca.SX.sym('der_pmguk')
         # self.controls = DecisionVariables.addControl(self.controls, der_pmguk, 'der_pmguk', 1, (-500e3, 500e3), self.initialSolution["der_pmguk"])
@@ -234,10 +250,10 @@ class CarModel(BaseModel):
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rr, 'alpha_rr')
 
         # Wheel Longitudinal Slips
-        kappa_fl = Sxf
-        kappa_fr = Sxf
-        kappa_rl = Sxr
-        kappa_rr = Sxr
+        kappa_fl = Sxfl
+        kappa_fr = Sxfr
+        kappa_rl = Sxrl
+        kappa_rr = Sxrr
 
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fl, 'kappa_fl')
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fr, 'kappa_fr')
@@ -301,27 +317,32 @@ class CarModel(BaseModel):
 
         # Model Dynamics
         rhs = ca.SX.sym('rhs', self.states.num_x)
-        rhs[0] = Sf * der_n
-        rhs[1] = der_xi
-        rhs[2] = Sf * (dpsi*v + acc_x)
-        rhs[3] = Sf * (-dpsi*u + acc_y)
-        rhs[4] = Sf * der_dpsi
-        rhs[5] = Sf * der_x_ir
-        rhs[6] = Sf * der_y_ir
-        rhs[7] = Sf * der_psi
-        rhs[8] = Sf * der_delta
-        rhs[9] = Sf * der_Sxf
-        rhs[10] = Sf * der_Sxr
-        rhs[11] = Sf * der_acc_x
-        rhs[12] = Sf * der_acc_y
-        # rhs[13] = Sf * der_pmguk
-        # rhs[14] = Sf * -pmguk 
+        rhs[0] = Sf
+        rhs[1] = Sf * der_n
+        rhs[2] = der_xi
+        rhs[3] = Sf * (dpsi*v + acc_x)
+        rhs[4] = Sf * (-dpsi*u + acc_y)
+        rhs[5] = Sf * der_dpsi
+        rhs[6] = Sf * der_x_ir
+        rhs[7] = Sf * der_y_ir
+        rhs[8] = Sf * der_psi
+        rhs[9] = Sf * der_delta
+        rhs[10] = Sf * der_Sxfl
+        rhs[11] = Sf * der_Sxfr
+        rhs[12] = Sf * der_Sxrl
+        rhs[13] = Sf * der_Sxrr
+        rhs[14] = Sf * der_acc_x
+        rhs[15] = Sf * der_acc_y
+        # rhs[14] = Sf * der_pmguk
+        # rhs[15] = Sf * -pmguk
 
         # Stage Cost
         cost = ( Sf
                 + ( 0.01 * der_delta**2 ) 
-                + ( 0.005 * der_Sxf**2 ) 
-                + ( 0.005 * der_Sxr**2 )
+                + ( 0.0005 * der_Sxfl**2 ) 
+                + ( 0.0005 * der_Sxfr**2 )
+                + ( 0.0005 * der_Sxrl**2 )
+                + ( 0.0005 * der_Sxrr**2 )
                 # + ( 1e-9 * der_pmguk**2 )
             )
 
@@ -366,11 +387,24 @@ if __name__ == "__main__":
     # IPOPT Settings
     p_opts = {}
     s_opts = {"max_iter": 1000, 
-            "tol" : 1e-6,
-            "acceptable_tol": 1e-4,
-            "constr_viol_tol": 1e-3,
-            "compl_inf_tol": 1e-3,
-            "nlp_scaling_method": 'gradient-based',}
+        "tol" : 1e-6,
+        "acceptable_tol": 1e-4,
+        "constr_viol_tol": 1e-3,
+        "compl_inf_tol": 1e-3,
+        "nlp_scaling_method": 'gradient-based',}
+    # s_opts = {"max_iter": 1000, 
+    #         "tol" : 1e-4,
+    #         "acceptable_tol": 1e-2,
+    #         "constr_viol_tol": 1e-3,
+    #         "acceptable_constr_viol_tol": 1e-2,
+    #         "compl_inf_tol": 1e-3,
+    #         "dual_inf_tol": 1e-1,
+    #         "acceptable_dual_inf_tol": 1e2,
+    #         "nlp_scaling_method": 'gradient-based',
+    #         "mu_strategy": 'adaptive',
+    #         "mu_init": 1e-4,
+    #         "mu_target": 1e-6,
+    #         "mu_min": 1e-6,}
 
     # Generic Optimal Control Sim
 
