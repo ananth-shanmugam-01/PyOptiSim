@@ -5,6 +5,7 @@ import casadi as ca
 
 # Model Physics
 from model.Car.CarModel import CarModel
+from model.Car.component.track import loadTrackData
 
 # Transcription
 import src.tools.OptiProblem as OptiProblem
@@ -24,16 +25,26 @@ s_opts = {"max_iter": 1000,
           "compl_inf_tol": 1e-3,
           "nlp_scaling_method": 'gradient-based',}
 
-# Generic Optimal Control Sim
+# Instantiate Model
+modelFun = CarModel()
 
-modelFun = CarModel.factory()
+# Function update parameters and car data based on overrite functions
+modelFun = loadTrackData(modelFun, 'src/model/Car/component/dataFiles/FSUK_2023_processed.csv')
+endPoint = modelFun.settings['track']['sLap'][-1]
+numIntervals = 200 # Number of Phases
 
-
+modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
+modelFun.createMesh(endPoint, numIntervals)
+modelFun.loadCarData()
+modelFun.createInitialSolution()
+modelFun.createModelFunction()
+        
+# Create and Solve OCP
 optiProblem, Xs, Us, Gs = OptiProblem.createOptiProblem(modelFun)
-
-# Solve
 optiProblem.solver('ipopt',p_opts,s_opts)
 sol = optiProblem.solve() 
 
 # Assigning Values to Dict
 SimOut = SimOutputs.createOutputDict(optiProblem, modelFun, Xs, Us, Gs)
+
+SimOutputs.createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, 'FSUK_2023_results.csv')

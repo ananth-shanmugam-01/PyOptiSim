@@ -202,10 +202,10 @@ class CarModel(BaseModel):
         alpha_rl = ca.atan2( ( (v - self.settings['chassis']['rearLeverArm'] * dpsi) ) , u + 0.5 * self.settings['chassis']['halfTrackWidthRear'] )
         alpha_rr = ca.atan2( ( (v - self.settings['chassis']['rearLeverArm'] * dpsi) ) , u - 0.5 * self.settings['chassis']['halfTrackWidthRear'] )
 
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fl, 'alpha_fl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fr, 'alpha_fr')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rl, 'alpha_rl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rr, 'alpha_rr')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fl * 57.2958, 'alpha_fl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fr * 57.2958, 'alpha_fr')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rl * 57.2958, 'alpha_rl')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rr * 57.2958, 'alpha_rr')
 
         # Wheel Longitudinal Slips
         kappa_fl = Sxfl
@@ -267,6 +267,8 @@ class CarModel(BaseModel):
         der_y_ir = ( u * ca.sin(psi) + v * ca.cos(psi) )
         der_psi = dpsi
         power_wheel = Fx * u
+
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
 
         # Power at Wheel Constraint
         power_constraint = power_wheel - self.settings['powertrain']['PMGUKDeployMax']
