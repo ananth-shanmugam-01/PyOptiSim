@@ -4,10 +4,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import PchipInterpolator
 
-from src.model.BaseModel import BaseModel
 import src.tools.DecisionVariables as DecisionVariables
 
-from src.model.Car.simpleTyre import simpleTyre as simpleTyre
+from src.model.BaseModel import BaseModel
+from src.model.Car.component.simpleTyre import simpleTyre as simpleTyre
+from src.model.Car.component.track import loadTrackData, createSimpleTrack
 
 # Transcription
 import src.tools.OptiProblem as OptiProblem
@@ -19,49 +20,6 @@ import src.tools.SimOutputs as SimOutputs
 from src.tools.DebugSim import DebugSim
 
 class CarModel(BaseModel):
-
-    def loadTrackData(self, trackFile: str):
-        """ Load Track Data from JSON and update model parameters, until then use the values directly"""
-
-        trackData = pd.read_csv(trackFile)
-
-        params = dict()
-        params['track'] = dict()
-        params['track']['sLap'] = trackData['sLap'].to_numpy()
-        params['track']['curv'] = trackData['curv'].to_numpy()
-        params['track']['theta'] = trackData['theta'].to_numpy()
-        params['track']['xi'] = trackData['xi'].to_numpy()
-        params['track']['yi'] = trackData['yi'].to_numpy()
-
-        self.settings.update(params)
-
-    def createSimpleTrack(self, step_length, straight, turn_length, min_radius):
-
-        max_curv = 1/min_radius
-
-        curv_straight = np.zeros( np.ceil(straight/step_length).astype(int) )
-        curv_ascent = np.linspace(0,max_curv, np.ceil(turn_length/(2*step_length)).astype(int) )
-        curv_descent = np.linspace(max_curv,0, np.ceil(turn_length/(2*step_length)).astype(int) )
-
-        curv = np.concatenate( (curv_straight, curv_ascent, curv_descent[1:], curv_straight) )
-
-        dS = step_length * np.ones( curv.shape )
-
-        psi = np.cumsum( dS * curv )
-        sLap = np.cumsum(dS)
-        xi = np.cumsum( dS * np.cos(psi) )
-        yi = np.cumsum( dS * np.sin(psi) )
-
-        # Plumb into the outputs
-        params = dict()
-        params['track'] = dict()
-        params['track']['sLap'] = sLap
-        params['track']['curv'] = curv
-        params['track']['theta'] = psi
-        params['track']['xi'] = xi
-        params['track']['yi'] = yi
-
-        self.settings.update(params)
 
     def loadCarData(self):
         """ Load Car Data from JSON and update model parameters, until then use the values directly"""
@@ -353,18 +311,9 @@ class CarModel(BaseModel):
         
         modelFun = CarModel()
 
-        # # Test Track
-        # step_length = 1
-        # straight = 20
-        # turn_length = 50
-        # min_radius = 8
-        # modelFun.createSimpleTrack(step_length, straight, turn_length, min_radius)
-        # endPoint = modelFun.settings['track']['sLap'][-1]
-        # numIntervals = 50 # Number of Phases
+        # Function update parameters and car data based on overrite functions
+        modelFun = loadTrackData(modelFun, 'src/model/Car/component/dataFiles/FSUK_2023_processed.csv')
 
-        # # FSUK Track
-        trackFile = 'src/model/Car/dataFiles/FSUK_2023_processed.csv'
-        modelFun.loadTrackData(trackFile)
         endPoint = modelFun.settings['track']['sLap'][-1]
         numIntervals = 200 # Number of Phases
 
