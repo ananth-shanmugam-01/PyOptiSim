@@ -1,4 +1,5 @@
 #%% Generic Optimal Control Sim
+""" Generic Optimal Control Simulation - Rocket Landing Problem """
 
 #  Import CasADi
 import casadi as ca
