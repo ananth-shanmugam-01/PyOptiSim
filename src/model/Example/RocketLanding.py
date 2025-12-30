@@ -3,46 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import PchipInterpolator
 
-import src.tools.Mesh as Mesh
+
+from src.model.BaseModel import BaseModel
 import src.tools.DecisionVariables as DecisionVariables
 
-class model:
-    def __init__(self):
-        
-        # Mesh Properties
-        self.mesh_size = []
-        self.mesh_numIntervals = []
-        self.mesh_points   = [] # equivalent to sLap
-        
-        # Decision Variables
-        self.states, self.controls, self.parameters = DecisionVariables.initialiseDecisionVariables()
-        
-        # Initial Solution
-        self.initialSolution = dict()
+class RocketLanding(BaseModel):
 
-        # Model Outputs
-        self.cost         = []
-        self.path_constraints = []
-        self.modelFunction    = []
-                       
-    def createLagrangeCoefficients(self, collocation_degree, collocation_strategy):
-        
-        self.collocation_degree = collocation_degree
-        self.collocation_strategy = collocation_strategy
-        self.collocation_tau = np.array(ca.collocation_points(collocation_degree, collocation_strategy))
-        self.collocation_C, self.collocation_D, self.collocation_B = ca.collocation_coeff(self.collocation_tau)
-        
-    def createMesh(self, endPoint, numIntervals):
-        
-        meshObject = Mesh.mesh( endPoint, numIntervals, self.collocation_degree, self.collocation_tau )
-        self.mesh_size = meshObject.meshSize
-        self.mesh_numIntervals = numIntervals
-        self.mesh_points = meshObject.mesh
-    
     def createInitialSolution(self, endPoint, numIntervals):
 
         mesh = np.linspace(0,endPoint,numIntervals)
-
 
         g_mesh = 9.81 * np.ones(len(mesh))
         thrust = 20 # N
@@ -67,19 +36,6 @@ class model:
         initialSolution["velocity"] = PchipInterpolator(mesh, v_final)(self.mesh_points)
         initialSolution["mass"] = 1 * np.ones(len(self.mesh_points)) 
         initialSolution["thrust"] = PchipInterpolator(mesh, thrust_final)(self.mesh_points)
-
-        # # Data for plotting
-        # f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
-        # ax1.plot(mesh, v_forward, label='v_forward')
-        # ax1.plot(mesh, v_braking, label='v_braking')
-        # ax1.plot(mesh, v_final, label = 'final')
-        # ax1.set(xlabel='distance (m)', ylabel='velocity (m/s)',
-        #     title='Initial Solution')
-        # ax1.set_title('Velocity Trajectory')
-
-        # ax2.plot( mesh , thrust_final, '-o')
-        # ax2.set_title('Thrust Trajectory')
-        # plt.show()
 
         self.initialSolution = initialSolution
 
@@ -115,17 +71,18 @@ class model:
         rhs[0] = Sf * (g - thrust/mass)
         rhs[1] = Sf * (-c * thrust)
         
-        # Model Penalties
-        L = Sf
-        
-        self.modelFunction = ca.Function('f', [self.states.sym, self.controls.sym, self.parameters.sym], [rhs, L],['x', 'u', 'g'], ['rhs', 'L'])
+        # Stage Cost
+        cost = Sf
+
+        # Model Function
+        self.modelFunction = ca.Function('f', [self.states.sym, self.controls.sym, self.parameters.sym], [rhs, cost, self.path_constraints.sym, self.auxiliary_outputs.sym],['x', 'u', 'g'], ['rhs', 'cost', 'path_constraints', 'auxiliary_outputs'])
 
     def factory():
         
         endPoint = 50 # [m] Mesh Distance
         numIntervals = 15 # Number of Phases
         
-        modelFun = model()
+        modelFun = RocketLanding()
         modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
         modelFun.createMesh(endPoint, numIntervals)
         modelFun.createInitialSolution(endPoint, numIntervals)
@@ -147,19 +104,18 @@ class model:
 
         plt.show()
 
-    def unitTestModel():   
-        
-        endPoint = 50 # [m] Mesh Distance
-        numIntervals = 15 # Number of Phases
-        
-        modelFun = model()
-        modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
-        modelFun.createMesh(endPoint, numIntervals)
-        modelFun.createModelFunction()
-        
-        # Test Function
-        [x_dot, cost] = modelFun.modelFunction([8, 1], 4, 1);
-        print(x_dot)
-        print(cost)
-        
-        return modelFun
+if __name__ == "__main__":
+
+    endPoint = 50 # [m] Mesh Distance
+    numIntervals = 15 # Number of Phases
+    
+    modelFun = RocketLanding()
+    modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
+    modelFun.createMesh(endPoint, numIntervals)
+    modelFun.createModelFunction()
+    
+    # Test Function
+    [x_dot, cost] = modelFun.modelFunction([8, 1], 4, 1);
+    print(x_dot)
+    print(cost)
+
