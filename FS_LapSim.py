@@ -16,6 +16,10 @@ import src.tools.SimOutputs as SimOutputs
 # For Visualisation
 import matplotlib.pyplot as plt
 
+# User Settings
+sim_name = 'FSUK_Baseline_0001'
+sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/'
+
 # IPOPT Settings
 p_opts = {}
 s_opts = {"max_iter": 1000, 
@@ -47,4 +51,4 @@ sol = optiProblem.solve()
 # Assigning Values to Dict
 SimOut = SimOutputs.createOutputDict(optiProblem, modelFun, Xs, Us, Gs)
 
-SimOutputs.createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, 'FSUK_2023_results.csv')
+SimOutputs.createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, f'{sim_output_path}/{sim_name}.csv')
