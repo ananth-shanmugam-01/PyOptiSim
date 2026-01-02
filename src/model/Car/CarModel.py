@@ -266,7 +266,7 @@ class CarModel(BaseModel):
         der_x_ir = ( u * ca.cos(psi) - v * ca.sin(psi) )
         der_y_ir = ( u * ca.sin(psi) + v * ca.cos(psi) )
         der_psi = dpsi
-        power_wheel = Fx * u
+        power_wheel = (Fx - Fd) * u # Cost of drag power
 
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
 
