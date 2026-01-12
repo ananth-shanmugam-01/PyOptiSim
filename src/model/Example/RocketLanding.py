@@ -93,14 +93,15 @@ class RocketLanding(BaseModel):
     def createResultPlots(SimOut):
 
         f, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True)
-        ax1.plot( SimOut.mesh , SimOut.states["velocity"], '-o')
+        ax1.plot( SimOut.sLap , SimOut.states["velocity"], '-o')
         ax1.set_title('Velocity Trajectory')
 
-        ax2.plot( SimOut.mesh , SimOut.states["mass"], '-o')
+        ax2.plot( SimOut.sLap , SimOut.states["mass"], '-o')
         ax2.set_title('Mass State Trajectory')
 
-        ax3.plot( SimOut.mesh , SimOut.controls["thrust"], '-o')
+        ax3.plot( SimOut.sLap , SimOut.controls["thrust"], '-o')
         ax3.set_title('Thrust Control Trajectory')
+        ax3.set_xlabel('Distance [m]')
 
         plt.show()
 

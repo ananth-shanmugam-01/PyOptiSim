@@ -1,6 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import scienceplots as splt
 import numpy as np
+import os
 
 """ Collection of functions to create and load track data for CarModel """
 
@@ -53,19 +55,32 @@ def createSimpleTrack(CarModel, step_length, straight, turn_length, min_radius):
 
 if __name__ == "__main__":
     
-    # Raw Track Data File Path
-    fp = "/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/dataFiles/FSUK_2023.csv"
+    # # Raw Track Data File Path
+    # fp = "/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/dataFiles/FSUK_2023.csv"
+    # df = pd.read_csv(fp)
+
+    # # re-calculate x, y, psi from curvature and sLap
+    # dS = np.gradient(df['sLap'])
+    # curv = df['curv']
+    # theta = np.cumsum(dS * curv)
+    # xi = np.cumsum(dS * np.cos(theta))
+    # yi = np.cumsum(dS * np.sin(theta))
+
+    # # Save processed data to a new CSV file
+    # processed_fp = "/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/dataFiles/FSUK_2023_processed.csv"
+    # df_processed = pd.DataFrame({'sLap': df['sLap'],'curv': curv, 'theta': theta, 'xi': xi, 'yi': yi})
+    # df_processed.to_csv(processed_fp, index=False)
+
+    fp = "/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/component/dataFiles/FSUK_2023_processed.csv"
     df = pd.read_csv(fp)
 
-    # re-calculate x, y, psi from curvature and sLap
-    dS = np.gradient(df['sLap'])
-    curv = df['curv']
-    theta = np.cumsum(dS * curv)
-    xi = np.cumsum(dS * np.cos(theta))
-    yi = np.cumsum(dS * np.sin(theta))
-
-    # Save processed data to a new CSV file
-    processed_fp = "/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/dataFiles/FSUK_2023_processed.csv"
-    df_processed = pd.DataFrame({'sLap': df['sLap'],'curv': curv, 'theta': theta, 'xi': xi, 'yi': yi})
-    df_processed.to_csv(processed_fp, index=False)
-
+    plt.style.use(['science', 'grid'])
+    # Sensitivity Plots, plot all sim_list names with their laptimes
+    plt.figure(figsize=(8, 5))
+    plt.plot(df['xi'], df['yi'])
+    plt.xlabel('X-Coordinates (m)')
+    plt.ylabel('Y-Coordinates (m)')
+    plt.title('FSUK 2023 Track Map')
+    plt.grid(True)
+    plt.savefig(os.path.join('/Users/ananthshanmugam/Desktop/SimResults/', 'FSUK_Track_Map.png'), dpi=300)
+    plt.show()

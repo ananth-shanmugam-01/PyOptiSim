@@ -2,6 +2,7 @@
 
 #  Import CasADi
 import casadi as ca
+import numpy as np
 
 # Model Physics
 from model.Car.CarModel import CarModel
@@ -17,42 +18,46 @@ import src.tools.SimOutputs as SimOutputs
 import matplotlib.pyplot as plt
 
 # User Settings
-sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/rAeroBalance_v2/'
+sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/TestForPR/'
 
 # Sweep Parameters
-sweep_params = {
-    'chassis': {
-        'SCx': [0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0],
-    },
-    }
+# sweep_params = {
+#     'chassis': {
+#         'SCx': [0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0],
+#     },
+#     }
+
+# sweep_params = {
+#     'chassis': {
+#         'rAeroBalance': [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+#     },
+# }
 
 sweep_params = {
     'chassis': {
-        'rAeroBalance': [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+        'weightDistribution': [0.3, 0.38, 0.42, 0.46, 0.50, 0.54, 0.6],
     },
 }
-# params['chassis'] = dict()
-# params['chassis']['mass'] = 260 # fully loaded mass in kg
-# params['chassis']['Izz'] = 110 # yaw inertia in kgm^2
-# params['chassis']['wheelbase'] = 1.535 # m
-# params['chassis']['weightDistribution'] = 0.45 # [-] front axle weight distribution
-# params['chassis']['hCoG'] = 0.28 # m
-# params['chassis']['rollStiffnessDistribution'] = 0.5 # [-] front axle roll stiffness distribution
-# params['chassis']['trackWidthFront'] = 1.21 # m
-# params['chassis']['trackWidthRear'] = 1.21 # m
-# params['chassis']['rWheel'] = 0.2032 # m, loaded radius is approx 0.196 [m]
 
-# # Aerodynamic Parameters
-# params['chassis']['SCz'] = 3.8 # [-]
-# params['chassis']['SCx'] = 1.2 # [-]
-# params['chassis']['rAeroBalance'] = 0.48 # [-] Aero Downforce Distribution at Front Axle
+# sweep_params = {
+#     'chassis': {
+#         'rollStiffnessDistribution': [0.3, 0.38, 0.42, 0.46, 0.50, 0.54, 0.6],
+#     },
+# }
 
-# # Powertrain Parameters
-# params['powertrain'] = dict()
-# params['powertrain']['PMGUKDeployMax'] = 80e3 # Maximum Deployment MGUK Power in W
-# params['powertrain']['PMGUKHarvestMax'] = 40e3 # Maximum Harvest MGUK Power in W
-# params['powertrain']['EESSCapacity'] = 5.8 * 3.6e6 / 22 # Battery Pack Range in J from kWh - 5.8 kWh pack over 22 laps
+# sweep_params = {
+#     'tyre': {
+#         'lateral_grip_scalar': [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4],
+#         'longitudinal_grip_scalar': [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4],
+#     },
+# }
 
+# sweep_params = {
+#     'chassis': {
+#         'SCz': np.array(np.linspace(3.8-0.5, 3.8+0.5, 5)),
+#         'SCx': np.array(np.linspace(1.2-0.5, 1.2+0.5, 5)),
+#     },
+# }
 
 # IPOPT Settings
 p_opts = {}
@@ -62,6 +67,7 @@ s_opts = {"max_iter": 1000,
           "constr_viol_tol": 1e-3,
           "compl_inf_tol": 1e-3,
           "nlp_scaling_method": 'gradient-based',}
+
 # Iterate over sweep parameters and their values
 for category, params in sweep_params.items():
     for param_name, param_values in params.items():

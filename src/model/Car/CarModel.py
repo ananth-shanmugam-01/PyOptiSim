@@ -68,6 +68,8 @@ class CarModel(BaseModel):
         params['tyre']['peak_muy_slip_load_2'] = np.radians(8) # radians
         params['tyre']['longitudinal_shape_factor'] = 1.9
         params['tyre']['lateral_shape_factor']  = 1.7 
+        params['tyre']['lateral_grip_scalar'] = 1.0
+        params['tyre']['longitudinal_grip_scalar'] = 1.0
 
         # Calculated Parameters
         params['chassis']['frontLeverArm'] = (1- params['chassis']['weightDistribution']) * params['chassis']['wheelbase'] # m
@@ -274,6 +276,12 @@ class CarModel(BaseModel):
         power_constraint = power_wheel - self.settings['powertrain']['PMGUKDeployMax']
         # Model Path Constraints
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (-np.inf, 0) )
+
+        # Non-Negative Wheel Loads
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_fl, 'Fz_fl_constraint', 1e4, (0, np.inf) )
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_fr, 'Fz_fr_constraint', 1e4, (0, np.inf) )
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_rl, 'Fz_rl_constraint', 1e4, (0, np.inf) )
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_rr, 'Fz_rr_constraint', 1e4, (0, np.inf) )
 
         # Model Dynamics
         rhs = ca.SX.sym('rhs', self.states.num_x)

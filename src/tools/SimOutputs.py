@@ -41,7 +41,7 @@ def createOutputDict(optiProblem, modelFun, Xs, Us, Gs) -> dict:
 
     simOut.cost = np.array(optiProblem.value(L))
 
-    simOut.sLap = modelFun.mesh_points
+    simOut.sLap = np.array(modelFun.mesh_points)
     
     return simOut
 

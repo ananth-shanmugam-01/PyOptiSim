@@ -7,14 +7,13 @@ import os
 
 # Load Results
 
-sim_list = {'3.0': '/Users/ananthshanmugam/Desktop/SimResults/SCz/FSUK_chassis_SCz_3.csv',
-            '3.4': '/Users/ananthshanmugam/Desktop/SimResults/SCz/FSUK_chassis_SCz_3_4.csv',
-            '3.8': '/Users/ananthshanmugam/Desktop/SimResults/SCz/FSUK_chassis_SCz_3_8.csv',
-            '4.2': '/Users/ananthshanmugam/Desktop/SimResults/SCz/FSUK_chassis_SCz_4_2.csv',
-            '4.6': '/Users/ananthshanmugam/Desktop/SimResults/SCz/FSUK_chassis_SCz_4_6.csv',
-            '4.8': '/Users/ananthshanmugam/Desktop/SimResults/SCz/FSUK_chassis_SCz_4_8.csv',
-            '5.0': '/Users/ananthshanmugam/Desktop/SimResults/SCz/FSUK_chassis_SCz_5_0.csv',
-            '5.2': '/Users/ananthshanmugam/Desktop/SimResults/SCz/FSUK_chassis_SCz_5_2.csv',
+sim_list = {'0.3': '/Users/ananthshanmugam/Desktop/SimResults/rollStiffnessDistribution/FSUK_chassis_rollStiffnessDistribution_0_3.csv',
+            '0.38': '/Users/ananthshanmugam/Desktop/SimResults/rollStiffnessDistribution/FSUK_chassis_rollStiffnessDistribution_0_38.csv',
+            '0.42': '/Users/ananthshanmugam/Desktop/SimResults/rollStiffnessDistribution/FSUK_chassis_rollStiffnessDistribution_0_42.csv',
+            '0.46': '/Users/ananthshanmugam/Desktop/SimResults/rollStiffnessDistribution/FSUK_chassis_rollStiffnessDistribution_0_46.csv',
+            '0.50': '/Users/ananthshanmugam/Desktop/SimResults/rollStiffnessDistribution/FSUK_chassis_rollStiffnessDistribution_0_5.csv',
+            '0.54': '/Users/ananthshanmugam/Desktop/SimResults/rollStiffnessDistribution/FSUK_chassis_rollStiffnessDistribution_0_54.csv',
+            '0.6': '/Users/ananthshanmugam/Desktop/SimResults/rollStiffnessDistribution/FSUK_chassis_rollStiffnessDistribution_0_6.csv',
             }
 
 # check that files exist
@@ -32,31 +31,19 @@ plt.style.use(['science', 'grid'])
 # Sensitivity Plots, plot all sim_list names with their laptimes
 plt.figure(figsize=(8, 5))
 laptimes = []
-SCz_levels = []
+rRollStiffnessDistribution_levels = []
 for sim_name, results_df in results_data.items():
     laptime = results_df['t'].iloc[-1]
     laptimes.append(laptime)
-    SCz = float(sim_name.replace('FSUK_chassis_SCz_', '').replace('.csv', ''))
-    SCz_levels.append(SCz)
-    plt.plot(SCz, laptime, 'o')
-plt.plot(SCz_levels, laptimes, '-')
-plt.xlabel('SCz (-)')
+    rRollStiffnessDistribution = float(sim_name.replace('FSUK_chassis_rollStiffnessDistribution_', '').replace('.csv', ''))
+    rRollStiffnessDistribution_levels.append(rRollStiffnessDistribution)
+    plt.plot(rRollStiffnessDistribution, laptime, 'o')
+plt.plot(rRollStiffnessDistribution_levels, laptimes, '-')
+plt.xlabel('rollStiffnessDistribution (-)')
 plt.ylabel('Laptime (s)')
-plt.title('FSUK LapSim - SCz Sensitivity')
+plt.title('FSUK LapSim - rollStiffnessDistribution Sensitivity')
 plt.grid(True)
-plt.savefig(os.path.join('/Users/ananthshanmugam/Desktop/SimResults/SCz/', 'FSUK_SCz_Sensitivity_Overview.png'), dpi=300)
-# plt.show()
-
-# Normalise SCz levels for better visualisation of sensitivities
-middle_SCz = 3.8
-norm_SCz_levels = [scz - middle_SCz for scz in SCz_levels]
-plt.figure(figsize=(8, 5))
-plt.plot(norm_SCz_levels, laptimes, 'o-')
-plt.xlabel('Normalized SCz (-)')
-plt.ylabel('Laptime (s)')
-plt.title('FSUK LapSim - Normalized SCz Sensitivity')
-plt.grid(True)
-plt.savefig(os.path.join('/Users/ananthshanmugam/Desktop/SimResults/SCz/', 'FSUK_Normalized_SCz_Sensitivity_Overview.png'), dpi=300)
+plt.savefig(os.path.join('/Users/ananthshanmugam/Desktop/SimResults/rollStiffnessDistribution/', 'FSUK_rollStiffnessDistribution_Sensitivity_Overview.png'), dpi=300)
 plt.show()
 
 # # Time series plots
