@@ -58,7 +58,6 @@ def createOptiProblem(model):
         
         cost = cost + np.matmul( L , model.collocation_B * model.mesh_size )
         
-        # Bring together all the points in this phase [0, 1, 2, 3]
         Z_s = ca.horzcat( Xk , Xc )
         Z_u = ca.horzcat( Uk , Uc )
         

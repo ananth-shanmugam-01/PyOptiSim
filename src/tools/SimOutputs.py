@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import os
 
 class SimOutputs:
     def __init__(self):
@@ -40,7 +41,7 @@ def createOutputDict(optiProblem, modelFun, Xs, Us, Gs) -> dict:
 
     simOut.cost = np.array(optiProblem.value(L))
 
-    simOut.sLap = modelFun.mesh_points
+    simOut.sLap = np.array(modelFun.mesh_points)
     
     return simOut
 
@@ -76,7 +77,7 @@ def createDebugOutputDict(optiProblem, modelFun, Xs, Us, Gs) -> dict:
     
     return simOut
 
-def createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, result_filename: str):
+def createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, result_folder: str, result_filename: str):
     """ Create a results CSV file containing only the states and auxiliary outputs """
 
     # Initialize an empty dictionary to store data
@@ -98,5 +99,9 @@ def createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, result_filename: str):
     # Create the DataFrame from the dictionary
     df = pd.DataFrame(data)
 
+    # Check if result_folder exists as a folder, if not create the folder
+    if not os.path.exists(result_folder):
+        os.makedirs(result_folder)
+
     # Save the DataFrame to a CSV file
-    df.to_csv(result_filename, index=False)
+    df.to_csv(os.path.join(result_folder, result_filename), index=False)

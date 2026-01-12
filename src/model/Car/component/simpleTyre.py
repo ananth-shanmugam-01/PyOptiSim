@@ -37,6 +37,8 @@ def simpleTyre(kappa: float, alpha: float, Fz: float, settings: dict):
     alpha_2 = settings['tyre']['peak_muy_slip_load_2']  # e.g. 8
     Qx = settings['tyre']['longitudinal_shape_factor']  # e.g. 1.9
     Qy = settings['tyre']['lateral_shape_factor']       # corrected key
+    lateral_grip_scalar = settings['tyre']['lateral_grip_scalar']
+    longitudinal_grip_scalar = settings['tyre']['longitudinal_grip_scalar']
 
     # Equations
     mux_max = mux_max_1 + (Fz - Fz1) * (mux_max_2 - mux_max_1)/(Fz2 - Fz1)
@@ -55,8 +57,8 @@ def simpleTyre(kappa: float, alpha: float, Fz: float, settings: dict):
     Sx = ca.pi/(2*ca.atan(Qx))
     Sy = ca.pi/(2*ca.atan(Qy))
 
-    mux = mux_max * ca.sin(Qx * ca.atan(Sx * rho))
-    muy = muy_max * ca.sin(Qy * ca.atan(Sy * rho))
+    mux = longitudinal_grip_scalar * mux_max * ca.sin(Qx * ca.atan(Sx * rho))
+    muy = lateral_grip_scalar * muy_max * ca.sin(Qy * ca.atan(Sy * rho))
 
     Fx = mux * Fz * kappa_norm/(rho)
     Fy = -muy * Fz * alpha_norm/(rho)
