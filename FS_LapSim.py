@@ -18,46 +18,7 @@ import src.tools.SimOutputs as SimOutputs
 import matplotlib.pyplot as plt
 
 # User Settings
-sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/TestForPR/'
-
-# Sweep Parameters
-# sweep_params = {
-#     'chassis': {
-#         'SCx': [0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0],
-#     },
-#     }
-
-# sweep_params = {
-#     'chassis': {
-#         'rAeroBalance': [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-#     },
-# }
-
-sweep_params = {
-    'chassis': {
-        'weightDistribution': [0.3, 0.38, 0.42, 0.46, 0.50, 0.54, 0.6],
-    },
-}
-
-# sweep_params = {
-#     'chassis': {
-#         'rollStiffnessDistribution': [0.3, 0.38, 0.42, 0.46, 0.50, 0.54, 0.6],
-#     },
-# }
-
-# sweep_params = {
-#     'tyre': {
-#         'lateral_grip_scalar': [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4],
-#         'longitudinal_grip_scalar': [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4],
-#     },
-# }
-
-# sweep_params = {
-#     'chassis': {
-#         'SCz': np.array(np.linspace(3.8-0.5, 3.8+0.5, 5)),
-#         'SCx': np.array(np.linspace(1.2-0.5, 1.2+0.5, 5)),
-#     },
-# }
+sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/'
 
 # IPOPT Settings
 p_opts = {}
@@ -67,6 +28,14 @@ s_opts = {"max_iter": 1000,
           "constr_viol_tol": 1e-3,
           "compl_inf_tol": 1e-3,
           "nlp_scaling_method": 'gradient-based',}
+
+sim_name = 'FSUK_EnergyManagement_3_8kWh'
+
+sweep_params = {
+    'powertrain': {
+        'DeltaSoCLimit': [(-3.8 * 3.6e6) / 22],
+    },
+}
 
 # Iterate over sweep parameters and their values
 for category, params in sweep_params.items():
@@ -91,11 +60,11 @@ for category, params in sweep_params.items():
             else:
                 print(f"Warning: {category}.{param_name} not found in modelFun.settings. Skipping update.")
 
-            # Update simulation name to reflect the current parameter value
-            sim_name = f"{category}_{param_name}_{param_value}"
+            # # Update simulation name to reflect the current parameter value
+            # sim_name = f"{category}_{param_name}_{param_value}"
 
-            # if sim_name has periods or spaces, replace them with underscores
-            sim_name = sim_name.replace('.', '_').replace(' ', '_')
+            # # if sim_name has periods or spaces, replace them with underscores
+            # sim_name = sim_name.replace('.', '_').replace(' ', '_')
 
             # Solve the optimization problem for the current parameter set
             print(f"Running simulation for {category}.{param_name} = {param_value}")

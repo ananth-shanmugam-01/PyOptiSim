@@ -51,8 +51,8 @@ class CarModel(BaseModel):
         # Powertrain Parameters
         params['powertrain'] = dict()
         params['powertrain']['PMGUKDeployMax'] = 80e3 # Maximum Deployment MGUK Power in W
-        params['powertrain']['PMGUKHarvestMax'] = 40e3 # Maximum Harvest MGUK Power in W
-        params['powertrain']['EESSCapacity'] = 5.8 * 3.6e6 / 22 # Battery Pack Range in J from kWh - 5.8 kWh pack over 22 laps
+        params['powertrain']['PMGUKHarvestMax'] = 0 # Maximum Harvest MGUK Power in W
+        params['powertrain']['DeltaSoCLimit'] = -7.8 * 3.6e6 / 22 # Allowable SoC Delta given battery capacity in J from kWh - 7.8 kWh pack over 22 laps
 
         # Tyre Parameters
         params['tyre'] = dict()
@@ -100,7 +100,7 @@ class CarModel(BaseModel):
         initialSolution["acc_x"] = np.zeros(len(self.mesh_points)) # m/s^2
         initialSolution["acc_y"] = np.zeros(len(self.mesh_points)) # m/s^2
         initialSolution["pmguk"] = np.zeros(len(self.mesh_points)) # W
-        initialSolution["EESS"] = np.zeros(len(self.mesh_points)) # J
+        initialSolution["DeltaSoC"] = np.zeros(len(self.mesh_points)) # J
 
         # Initial Solution for Controls
         initialSolution["der_delta"] = np.zeros(len(self.mesh_points))
@@ -163,11 +163,11 @@ class CarModel(BaseModel):
         acc_y = ca.SX.sym('acc_y') # lateral acceleration (m/s^2)
         self.states = DecisionVariables.addState(self.states, acc_y, 'acc_y', 'der_acc_y', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_y"]) 
 
-        # pmguk = ca.SX.sym('pmguk') # MGUK Deploy Power at the Wheel (W)
-        # self.states = DecisionVariables.addState(self.states, pmguk, 'pmguk', 'der_pmguk', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], self.settings['powertrain']['PMGUKDeployMax']), 0, (0, 0), self.initialSolution["pmguk"]) 
+        pmguk = ca.SX.sym('pmguk') # MGUK Deploy Power at the Wheel (W)
+        self.states = DecisionVariables.addState(self.states, pmguk, 'pmguk', 'der_pmguk', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], self.settings['powertrain']['PMGUKDeployMax']), 0, (0, 0), self.initialSolution["pmguk"]) 
 
-        # EESS = ca.SX.sym('EESS') # Battery State of Charge (J)
-        # self.states = DecisionVariables.addState(self.states, EESS, 'EESS', 'pmguk', 1e6, (0, self.settings['powertrain']['EESSCapacity']), 1, (0, 0),  self.initialSolution["EESS"]) 
+        DeltaSoC = ca.SX.sym('DeltaSoC') # Battery State of Charge Delta from Start of Lap (J)
+        self.states = DecisionVariables.addState(self.states, DeltaSoC, 'DeltaSoC', 'pmguk', 1e6, (self.settings['powertrain']['DeltaSoCLimit'], 1e6), 1, (0, 0),  self.initialSolution["DeltaSoC"]) 
 
         # Controls
         der_delta = ca.SX.sym('der_delta')
@@ -185,8 +185,8 @@ class CarModel(BaseModel):
         der_Sxrr = ca.SX.sym('der_Sxrr')
         self.controls = DecisionVariables.addControl(self.controls, der_Sxrr, 'der_Sxrr', 1, (-10, 10), self.initialSolution["der_Sxr"])
 
-        # der_pmguk = ca.SX.sym('der_pmguk')
-        # self.controls = DecisionVariables.addControl(self.controls, der_pmguk, 'der_pmguk', 1, (-500e3, 500e3), self.initialSolution["der_pmguk"])
+        der_pmguk = ca.SX.sym('der_pmguk')
+        self.controls = DecisionVariables.addControl(self.controls, der_pmguk, 'der_pmguk', 1e6, (-500e3, 500e3), self.initialSolution["der_pmguk"])
         
         # Parameters
         curv = ca.SX.sym('curv')
@@ -273,7 +273,8 @@ class CarModel(BaseModel):
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
 
         # Power at Wheel Constraint
-        power_constraint = power_wheel - self.settings['powertrain']['PMGUKDeployMax']
+        power_constraint = power_wheel - pmguk
+
         # Model Path Constraints
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (-np.inf, 0) )
 
@@ -301,8 +302,8 @@ class CarModel(BaseModel):
         rhs[13] = Sf * der_Sxrr
         rhs[14] = Sf * der_acc_x
         rhs[15] = Sf * der_acc_y
-        # rhs[14] = Sf * der_pmguk
-        # rhs[15] = Sf * -pmguk
+        rhs[16] = Sf * der_pmguk
+        rhs[17] = Sf * -pmguk
 
         # Stage Cost
         cost = ( Sf
@@ -311,7 +312,7 @@ class CarModel(BaseModel):
                 + ( 0.0005 * der_Sxfr**2 )
                 + ( 0.0005 * der_Sxrl**2 )
                 + ( 0.0005 * der_Sxrr**2 )
-                # + ( 1e-9 * der_pmguk**2 )
+                + ( 1e-9 * der_pmguk)**2 
             )
 
         # Model Function
