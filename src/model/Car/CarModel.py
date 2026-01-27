@@ -10,6 +10,8 @@ from src.model.BaseModel import BaseModel
 from src.model.Car.component.simpleTyre import simpleTyre as simpleTyre
 from src.model.Car.component.track import loadTrackData, createSimpleTrack
 
+from src.maths.smooth_max import smooth_max
+
 # Transcription
 import src.tools.OptiProblem as OptiProblem
 
@@ -51,7 +53,7 @@ class CarModel(BaseModel):
         # Powertrain Parameters
         params['powertrain'] = dict()
         params['powertrain']['PMGUKDeployMax'] = 80e3 # Maximum Deployment MGUK Power in W
-        params['powertrain']['PMGUKHarvestMax'] = 0 # Maximum Harvest MGUK Power in W
+        params['powertrain']['PMGUKHarvestMax'] = -10e3 # Maximum Harvest MGUK Power in W
         params['powertrain']['DeltaSoCLimit'] = -7.8 * 3.6e6 / 22 # Allowable SoC Delta given battery capacity in J from kWh - 7.8 kWh pack over 22 laps
 
         # Tyre Parameters
@@ -163,8 +165,11 @@ class CarModel(BaseModel):
         acc_y = ca.SX.sym('acc_y') # lateral acceleration (m/s^2)
         self.states = DecisionVariables.addState(self.states, acc_y, 'acc_y', 'der_acc_y', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_y"]) 
 
-        pmguk = ca.SX.sym('pmguk') # MGUK Deploy Power at the Wheel (W)
-        self.states = DecisionVariables.addState(self.states, pmguk, 'pmguk', 'der_pmguk', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], self.settings['powertrain']['PMGUKDeployMax']), 0, (0, 0), self.initialSolution["pmguk"]) 
+        pmguk_deploy = ca.SX.sym('pmguk_deploy') # MGUK Deploy Power at the Wheel (W)
+        self.states = DecisionVariables.addState(self.states, pmguk_deploy, 'pmguk_deploy', 'der_pmguk_deploy', 1e6, (0, self.settings['powertrain']['PMGUKDeployMax']), 0, (0, 0), self.initialSolution["pmguk"]) 
+
+        pmguk_harvest = ca.SX.sym('pmguk_harvest') # MGUK Harvest Power at the Wheel (W)
+        self.states = DecisionVariables.addState(self.states, pmguk_harvest, 'pmguk_harvest', 'der_pmguk_harvest', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], 0), 0, (0, 0), self.initialSolution["pmguk"]) 
 
         DeltaSoC = ca.SX.sym('DeltaSoC') # Battery State of Charge Delta from Start of Lap (J)
         self.states = DecisionVariables.addState(self.states, DeltaSoC, 'DeltaSoC', 'pmguk', 1e6, (self.settings['powertrain']['DeltaSoCLimit'], 1e6), 1, (0, 0),  self.initialSolution["DeltaSoC"]) 
@@ -185,9 +190,12 @@ class CarModel(BaseModel):
         der_Sxrr = ca.SX.sym('der_Sxrr')
         self.controls = DecisionVariables.addControl(self.controls, der_Sxrr, 'der_Sxrr', 1, (-10, 10), self.initialSolution["der_Sxr"])
 
-        der_pmguk = ca.SX.sym('der_pmguk')
-        self.controls = DecisionVariables.addControl(self.controls, der_pmguk, 'der_pmguk', 1e6, (-500e3, 500e3), self.initialSolution["der_pmguk"])
-        
+        der_pmguk_deploy = ca.SX.sym('der_pmguk_deploy')
+        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_deploy, 'der_pmguk_deploy', 1e6, (-500e3, 500e3), self.initialSolution["der_pmguk"])
+
+        der_pmguk_harvest = ca.SX.sym('der_pmguk_harvest')
+        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_harvest, 'der_pmguk_harvest', 1e6, (-500e3, 500e3), self.initialSolution["der_pmguk"])
+
         # Parameters
         curv = ca.SX.sym('curv')
         curv_interp = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['curv']) (self.mesh_points)
@@ -273,10 +281,12 @@ class CarModel(BaseModel):
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
 
         # Power at Wheel Constraint
-        power_constraint = power_wheel - pmguk
+        power_deploy_constraint = power_wheel - pmguk_deploy # Path constraint to ensure that we don't deploy more power at wheelss
+        
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, pmguk_deploy + pmguk_harvest, 'power_battery')
 
         # Model Path Constraints
-        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (-np.inf, 0) )
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_deploy_constraint, 'power_deploy_constraint', 1e5, (-np.inf, 0) )
 
         # Non-Negative Wheel Loads
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_fl, 'Fz_fl_constraint', 1e4, (0, np.inf) )
@@ -302,8 +312,9 @@ class CarModel(BaseModel):
         rhs[13] = Sf * der_Sxrr
         rhs[14] = Sf * der_acc_x
         rhs[15] = Sf * der_acc_y
-        rhs[16] = Sf * der_pmguk
-        rhs[17] = Sf * -pmguk
+        rhs[16] = Sf * der_pmguk_deploy
+        rhs[17] = Sf * der_pmguk_harvest
+        rhs[18] = Sf * (-pmguk_deploy - pmguk_harvest)
 
         # Stage Cost
         cost = ( Sf
@@ -312,7 +323,8 @@ class CarModel(BaseModel):
                 + ( 0.0005 * der_Sxfr**2 )
                 + ( 0.0005 * der_Sxrl**2 )
                 + ( 0.0005 * der_Sxrr**2 )
-                + ( 1e-9 * der_pmguk)**2 
+                + ( 1e-9 * der_pmguk_deploy)**2 
+                + ( 1e-9 * der_pmguk_harvest)**2
             )
 
         # Model Function

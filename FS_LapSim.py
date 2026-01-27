@@ -18,7 +18,7 @@ import src.tools.SimOutputs as SimOutputs
 import matplotlib.pyplot as plt
 
 # User Settings
-sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/'
+sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagementHarvest_10kW/'
 
 # IPOPT Settings
 p_opts = {}
