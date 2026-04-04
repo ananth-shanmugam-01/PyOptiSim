@@ -18,45 +18,51 @@ import src.tools.SimOutputs as SimOutputs
 import matplotlib.pyplot as plt
 
 # User Settings
-sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/BatteryCapacitySweep_v2/'
+sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/Study_2/'
 
 sim_groups = {
-    'PackCapacity_5_8kWh': {
+    'Endurance_0_1kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-5.8 * 3.6e6) / 22],
-            'PMGUKHarvestMax': 0
-        },
-        'chassis': {
-            'mass': 260 
+            'DeltaSoCLimit': [(-0.1 * 3.6e6)],
+            'PMGUKHarvestMax': -11e3
         },
     },
-    'PackCapacity_5_29kWh': {
+    'Endurance_0_15kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-5.29 * 3.6e6) / 22],
-            'PMGUKHarvestMax': 0
+            'DeltaSoCLimit': [(-0.15 * 3.6e6)],
+            'PMGUKHarvestMax': -11e3
         },
-        'chassis': {
-            'mass': 260-(32.944-30.16)
-        }
     },
-    'PackCapacity_4_84kWh': {
+    'Endurance_0_20kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-4.84 * 3.6e6) / 22],
-            'PMGUKHarvestMax': 0
+            'DeltaSoCLimit': [(-0.20 * 3.6e6)],
+            'PMGUKHarvestMax': -11e3
         },
-        'chassis': {
-            'mass': 260-(32.944-27.6)
-        }
-        },
-    'PackCapacity_4_35kWh': {
+    },
+    'Endurance_0_25kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-4.35 * 3.6e6) / 22],
-            'PMGUKHarvestMax': 0
+            'DeltaSoCLimit': [(-0.25 * 3.6e6)],
+            'PMGUKHarvestMax': -11e3
         },
-        'chassis': {
-            'mass': 260-(32.944-24.824)
-        }
-    }
+    },
+    'Endurance_0_30kWh': {
+        'powertrain': {
+            'DeltaSoCLimit': [(-0.30 * 3.6e6)],
+            'PMGUKHarvestMax': -11e3
+        },
+    },
+    'Endurance_0_35kWh': {
+        'powertrain': {
+            'DeltaSoCLimit': [(-0.35 * 3.6e6)],
+            'PMGUKHarvestMax': -11e3
+        },
+    },
+    'Endurance_0_40kWh': {
+        'powertrain': {
+            'DeltaSoCLimit': [(-0.40 * 3.6e6)],
+            'PMGUKHarvestMax': -11e3
+        },
+    },
 }
 
 

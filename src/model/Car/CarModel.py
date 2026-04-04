@@ -142,7 +142,7 @@ class CarModel(BaseModel):
         self.states = DecisionVariables.addState(self.states, y_ir, 'y_ir', 'der_y_ir', 100, (-20000, 20000), 0, (self.settings['track']['yi'][0],  self.settings['track']['yi'][-1]), self.initialSolution["y_ir"])     
         
         psi = ca.SX.sym('psi')     # yaw angle (rad)
-        self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 1, (-200, 200), 4, (self.settings['track']['theta'][0], self.settings['track']['theta'][-1]),  self.initialSolution["psi"])     
+        self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 1, (-200, 200), 1, (self.settings['track']['theta'][0], self.settings['track']['theta'][-1]),  self.initialSolution["psi"])     
 
         delta = ca.SX.sym('delta')  # steering angle (rad)
         self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-30), np.radians(30)), 3, (0, 0),  self.initialSolution["delta"])     
