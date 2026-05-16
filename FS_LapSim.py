@@ -18,49 +18,115 @@ import src.tools.SimOutputs as SimOutputs
 import matplotlib.pyplot as plt
 
 # User Settings
-sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/Study_2/'
+sim_output_path = '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/Study_5/'
 
 sim_groups = {
-    'Endurance_0_1kWh': {
+    'Endurance_Harvest_0kW_5.8kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-0.1 * 3.6e6)],
-            'PMGUKHarvestMax': -11e3
+            'PMGUKHarvestMax': 0,
+            'DeltaSoCLimit': -5.8 * 3.6e6 / 22
         },
     },
-    'Endurance_0_15kWh': {
+    'Endurance_Harvest_0kW_5.4kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-0.15 * 3.6e6)],
-            'PMGUKHarvestMax': -11e3
+            'PMGUKHarvestMax': 0,
+            'DeltaSoCLimit': -5.4 * 3.6e6 / 22
         },
     },
-    'Endurance_0_20kWh': {
+    'Endurance_Harvest_0kW_5.0kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-0.20 * 3.6e6)],
-            'PMGUKHarvestMax': -11e3
+            'PMGUKHarvestMax': 0,
+            'DeltaSoCLimit': -5.0 * 3.6e6 / 22
         },
     },
-    'Endurance_0_25kWh': {
+    'Endurance_Harvest_0kW_4.8kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-0.25 * 3.6e6)],
-            'PMGUKHarvestMax': -11e3
+            'PMGUKHarvestMax': 0,
+            'DeltaSoCLimit': -4.8 * 3.6e6 / 22
         },
     },
-    'Endurance_0_30kWh': {
+    'Endurance_Harvest_0kW_4.4kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-0.30 * 3.6e6)],
-            'PMGUKHarvestMax': -11e3
+            'PMGUKHarvestMax': 0,
+            'DeltaSoCLimit': -4.4 * 3.6e6 / 22
         },
     },
-    'Endurance_0_35kWh': {
+    'Endurance_Harvest_0kW_4.0kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-0.35 * 3.6e6)],
-            'PMGUKHarvestMax': -11e3
+            'PMGUKHarvestMax': 0,
+            'DeltaSoCLimit': -4.0 * 3.6e6 / 22
         },
     },
-    'Endurance_0_40kWh': {
+    'Endurance_Harvest_5kW_5.8kWh': {
         'powertrain': {
-            'DeltaSoCLimit': [(-0.40 * 3.6e6)],
-            'PMGUKHarvestMax': -11e3
+            'PMGUKHarvestMax': -5e3,
+            'DeltaSoCLimit': -5.8 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_5kW_5.4kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -5e3,
+            'DeltaSoCLimit': -5.4 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_5kW_5.0kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -5e3,
+            'DeltaSoCLimit': -5.0 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_5kW_4.8kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -5e3,
+            'DeltaSoCLimit': -4.8 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_5kW_4.4kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -5e3,
+            'DeltaSoCLimit': -4.4 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_5kW_4.0kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -5e3,
+            'DeltaSoCLimit': -4.0 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_10kW_5.8kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -10e3,
+            'DeltaSoCLimit': -5.8 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_10kW_5.4kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -10e3,
+            'DeltaSoCLimit': -5.4 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_10kW_5.0kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -10e3,
+            'DeltaSoCLimit': -5.0 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_10kW_4.8kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -10e3,
+            'DeltaSoCLimit': -4.8 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_10kW_4.4kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -10e3,
+            'DeltaSoCLimit': -4.4 * 3.6e6 / 22
+        },
+    },
+    'Endurance_Harvest_10kW_4.0kWh': {
+        'powertrain': {
+            'PMGUKHarvestMax': -10e3,
+            'DeltaSoCLimit': -4.0 * 3.6e6 / 22
         },
     },
 }

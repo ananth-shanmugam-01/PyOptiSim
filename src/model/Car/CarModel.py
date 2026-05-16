@@ -54,7 +54,8 @@ class CarModel(BaseModel):
         params['powertrain'] = dict()
         params['powertrain']['PMGUKDeployMax'] = 80e3 # Maximum Deployment MGUK Power in W
         params['powertrain']['PMGUKHarvestMax'] = -10e3 # Maximum Harvest MGUK Power in W
-        params['powertrain']['DeltaSoCLimit'] = -7.8 * 3.6e6 / 22 # Allowable SoC Delta given battery capacity in J from kWh - 7.8 kWh pack over 22 laps
+        params['powertrain']['DeltaSoCLimit'] = -5.8 * 3.6e6 / 22 # Allowable SoC Delta given battery capacity in J from kWh - 5.8 kWh pack over 22 laps
+        params['powertrain']['rBatteryEfficiency'] = 0.95 # Round Trip Battery Efficiency
 
         # Tyre Parameters
         params['tyre'] = dict()
@@ -281,7 +282,7 @@ class CarModel(BaseModel):
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
 
         # Power at Wheel Constraint
-        power_constraint = (pmguk_harvest + pmguk_deploy) - power_wheel # Path Constraint
+        power_constraint = (pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency'] + pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency']) - power_wheel # Path Constraint
         
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, pmguk_deploy + pmguk_harvest, 'power_battery')
 
@@ -314,7 +315,7 @@ class CarModel(BaseModel):
         rhs[15] = Sf * der_acc_y
         rhs[16] = Sf * der_pmguk_deploy
         rhs[17] = Sf * der_pmguk_harvest
-        rhs[18] = Sf * (-pmguk_deploy - pmguk_harvest)
+        rhs[18] = Sf * (-pmguk_deploy / self.settings['powertrain']['rBatteryEfficiency'] - pmguk_harvest * self.settings['powertrain']['rBatteryEfficiency'])
 
         # Stage Cost
         cost = ( Sf
