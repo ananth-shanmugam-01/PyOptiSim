@@ -11,8 +11,9 @@ import os
 # Load Results
 
 sim_list = {    
-                'Autocross' : '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/EnergyBudgetSweep/0.38kWh.csv',
-                'Endurance' : '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/EnergyBudgetSweep/0.26kWh.csv',
+                'Optimal' : '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/Study_6/OptimalDeployment/0.26kWh.csv',
+                '24m/s SpeedLimit' : '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/Study_7/24ms_vCarLimit/0.26kWh.csv',
+                '40kW PowerLimit' : '/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/Study_6/40kWPowerLimit/0.26kWh.csv',
             }
 # check that files exist
 for sim_name, sim_path in sim_list.items():
@@ -50,7 +51,7 @@ for sim_name, results_df in results_data.items():
 
 # Set axis labels and titles
 axs[0].set_ylabel('Vx (m/s)')
-axs[0].set_title('FSUK LapSim Results - Autocross vs Endurance')
+axs[0].set_title('Energy Management Strategies Comparison')
 axs[0].legend()
 
 axs[1].set_ylabel('{Ax} (m/s²)')
@@ -65,5 +66,5 @@ axs[2].set_yticklabels([f"{t}" for t in ticks])
 axs[3].set_xlabel('sLap (m)')
 axs[3].set_ylabel('Energy (kWh)')
 
-plt.savefig('/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/EnergyBudgetSweep/Autocross_vs_Endurance_baseline.png', dpi=300, bbox_inches='tight')
+plt.savefig('/Users/ananthshanmugam/Desktop/SimResults/EnergyManagement/EnergyManagementStrategiesComparison.png', dpi=300, bbox_inches='tight')
 plt.show()

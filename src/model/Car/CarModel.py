@@ -56,6 +56,7 @@ class CarModel(BaseModel):
         params['powertrain']['PMGUKHarvestMax'] = -10e3 # Maximum Harvest MGUK Power in W
         params['powertrain']['DeltaSoCLimit'] = -5.8 * 3.6e6 / 22 # Allowable SoC Delta given battery capacity in J from kWh - 5.8 kWh pack over 22 laps
         params['powertrain']['rBatteryEfficiency'] = 0.95 # Round Trip Battery Efficiency
+        params['powertrain']['vCarLimit'] = 150 # m/s - default for unconstrained
 
         # Tyre Parameters
         params['tyre'] = dict()
@@ -128,7 +129,7 @@ class CarModel(BaseModel):
         self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 1, (np.radians(-4), np.radians(4)), 3, (0, 0), self.initialSolution["xi"] )
 
         u = ca.SX.sym('u')         # vehicle fixed x-velocity (m/s)
-        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, 150), 3, (10, 0), self.initialSolution["u"] )
+        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, self.settings['powertrain']['vCarLimit']), 3, (10, 0), self.initialSolution["u"] )
 
         v = ca.SX.sym('v')         # vehicle fixed y-velocity (m/s)
         self.states = DecisionVariables.addState(self.states, v, 'v', 'accy', 10, (-1e2, 1e2), 3, (0, 0),  self.initialSolution["v"])
