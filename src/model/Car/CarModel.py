@@ -8,7 +8,7 @@ import src.tools.DecisionVariables as DecisionVariables
 
 from src.model.BaseModel import BaseModel
 from src.model.Car.component.simpleTyre import simpleTyre as simpleTyre
-from src.model.Car.component.track import loadTrackData, createSimpleTrack
+from model.Track.track import loadTrackData, createSimpleTrack
 
 from src.maths.smooth_max import smooth_max
 
