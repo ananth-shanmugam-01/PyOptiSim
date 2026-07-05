@@ -16,14 +16,14 @@ import tools.OptiProblem as OptiProblem
 import tools.SimOutputs as SimOutputs
 
 # Sim Debugging
-from src.tools.DebugSim import DebugSim
+from tools.DebugSim import DebugSim
 
 
 """ 
 Function to define the ordinary differential equations for the track model
 
 To Run the test-harness:
-python -m src.model.Track.TrackModel
+python -m model.Track.TrackModel
 
 """
 
@@ -128,8 +128,6 @@ class TrackModel(BaseModel):
         self.modelFunction = ca.Function('f', [self.states.sym, self.controls.sym, self.parameters.sym], [rhs, cost, self.path_constraints.sym, self.auxiliary_outputs.sym],['x', 'u', 'g'], ['rhs', 'cost', 'path_constraints', 'auxiliary_outputs'])
 
 
-
-
 if __name__ == "__main__":
 
 
@@ -149,7 +147,7 @@ if __name__ == "__main__":
     
     modelFun = TrackModel()
 
-    modelFun.ProcessRawTrackData(fp, smoothing_factor=10e3)
+    modelFun.ProcessRawTrackData(fp, smoothing_factor=1e5)
 
     endPoint = modelFun.settings['track']['sLap'][-1]
     numIntervals = 400 # Number of Phases

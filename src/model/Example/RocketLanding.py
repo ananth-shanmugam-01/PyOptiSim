@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import PchipInterpolator
 
 
-from src.model.BaseModel import BaseModel
-import src.tools.DecisionVariables as DecisionVariables
+from model.BaseModel import BaseModel
+import tools.DecisionVariables as DecisionVariables
 
 class RocketLanding(BaseModel):
 

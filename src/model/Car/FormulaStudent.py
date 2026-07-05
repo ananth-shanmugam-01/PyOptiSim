@@ -4,24 +4,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import PchipInterpolator
 
-import src.tools.DecisionVariables as DecisionVariables
+import tools.DecisionVariables as DecisionVariables
 
-from src.model.BaseModel import BaseModel
-from src.model.Car.component.simpleTyre import simpleTyre as simpleTyre
-from model.Track.track import loadTrackData, createSimpleTrack
-
-from src.maths.smooth_max import smooth_max
+from model.BaseModel import BaseModel
+from model.Car.component.simpleTyre import simpleTyre as simpleTyre
 
 # Transcription
-import src.tools.OptiProblem as OptiProblem
+import tools.OptiProblem as OptiProblem
 
 # Post Processing
-import src.tools.SimOutputs as SimOutputs
+import tools.SimOutputs as SimOutputs
 
 # Sim Debugging
-from src.tools.DebugSim import DebugSim
+from tools.DebugSim import DebugSim
 
-class CarModel(BaseModel):
+class FormulaStudent(BaseModel):
 
     def loadCarData(self):
         """ Load Car Data from JSON and update model parameters, until then use the values directly"""
@@ -82,6 +79,25 @@ class CarModel(BaseModel):
         params['chassis']['halfTrackWidthRear'] = params['chassis']['trackWidthRear'] / 2.0
         
         self.settings.update(params)
+
+        return self
+
+    def loadTrackData(self, trackFile: str): 
+        """ Load Track Data from JSON and update model parameters, until then use the values directly"""
+
+        trackData = pd.read_csv(trackFile)
+
+        params = dict()
+        params['track'] = dict()
+        params['track']['sLap'] = trackData['sLap'].to_numpy()
+        params['track']['curv'] = trackData['curv'].to_numpy()
+        params['track']['theta'] = trackData['theta'].to_numpy()
+        params['track']['xi'] = trackData['xi'].to_numpy()
+        params['track']['yi'] = trackData['yi'].to_numpy()
+
+        self.settings.update(params)
+
+        return self
 
     def createInitialSolution(self):
 
@@ -334,10 +350,10 @@ class CarModel(BaseModel):
 
     def factory():
         
-        modelFun = CarModel()
+        modelFun = FormulaStudent()
 
         # Function update parameters and car data based on overrite functions
-        modelFun = loadTrackData(modelFun, 'src/model/Car/component/dataFiles/FSUK_2023_processed.csv')
+        modelFun = modelFun.loadTrackData('src/model/Car/component/dataFiles/FSUK_2023_processed.csv')
 
         endPoint = modelFun.settings['track']['sLap'][-1]
         numIntervals = 200 # Number of Phases
@@ -382,7 +398,7 @@ if __name__ == "__main__":
 
     # Generic Optimal Control Sim
 
-    modelFun = CarModel.factory()
+    modelFun = FormulaStudent.factory()
 
     optiProblem, Xs, Us, Gs = OptiProblem.createOptiProblem(modelFun)
 

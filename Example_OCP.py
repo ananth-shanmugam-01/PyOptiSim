@@ -8,10 +8,10 @@ import casadi as ca
 from model.Example.RocketLanding import RocketLanding
 
 # Transcription
-import src.tools.OptiProblem as OptiProblem
+import tools.OptiProblem as OptiProblem
 
 # Post Processing
-import src.tools.SimOutputs as SimOutputs
+import tools.SimOutputs as SimOutputs
 
 # For Visualisation
 import matplotlib.pyplot as plt
