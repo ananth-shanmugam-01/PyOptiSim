@@ -29,7 +29,7 @@ python -m model.Track.TrackModel
 
 class TrackModel(BaseModel):
 
-    def ProcessRawTrackData(self, trackFile: str, smoothing_factor: float = 5e0):
+    def ProcessRawTrackData(self, trackFile: str, smoothing_factor: float = 1e5):
         """ Load Track Data from JSON and update model parameters, until then use the values directly"""
 
         trackData = pd.read_csv(trackFile)
