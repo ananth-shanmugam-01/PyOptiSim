@@ -53,10 +53,10 @@ class FormulaOne(BaseModel):
         params['powertrain'] = dict()
         params['powertrain']['kDifferential'] = 10.47 # Nms/rad - differential friction coefficient
         params['powertrain']['PMGUKDeployMax'] = 120e3 # Maximum Deployment MGUK Power in W
-        params['powertrain']['PMGUKHarvestMax'] = 120e3 # Maximum Harvest MGUK Power in W
-        params['powertrain']['DeltaEESSLimit'] = 4e6 # Battery Pack Range - SoC Delta limits from Max to Min in J
+        params['powertrain']['PMGUKHarvestMax'] = -120e3 # Maximum Harvest MGUK Power in W
+        params['powertrain']['DeltaEESSLimit'] = -4e6 # Battery Pack Range - SoC Delta limits from Max to Min in J
         params['powertrain']['isBalancedLap'] = True # If True, the battery SoC at the end of the lap is equal to the start of the lap
-        params['powertrain']['EMGUKHarvestLimit'] = 8e6 # Maximum Allowable Harvest Energy from MGUK in J
+        params['powertrain']['EMGUKHarvestLimit'] = -8e6 # Maximum Allowable Harvest Energy from MGUK in J
         params['powertrain']['rBatteryEfficiency'] = 0.95 # Round Trip Battery Efficiency
 
         # Tyre Parameters
@@ -94,8 +94,8 @@ class FormulaOne(BaseModel):
         params = dict()
         params['track'] = dict()
         params['track']['sLap'] = trackData['sLap'].to_numpy()
-        params['track']['curv'] = trackData['curv'].to_numpy()
-        params['track']['theta'] = trackData['theta'].to_numpy()
+        params['track']['curv'] = trackData['Kt'].to_numpy()
+        params['track']['theta'] = trackData['aTheta'].to_numpy()
         params['track']['xi'] = trackData['xi'].to_numpy()
         params['track']['yi'] = trackData['yi'].to_numpy()
 
@@ -193,12 +193,8 @@ class FormulaOne(BaseModel):
         pmguk_harvest = ca.SX.sym('pmguk_harvest') # MGUK Harvest Power at the Wheel (W)
         self.states = DecisionVariables.addState(self.states, pmguk_harvest, 'pmguk_harvest', 'der_pmguk_harvest', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], 0), 0, (0, 0), self.initialSolution["pmguk"]) 
 
-        EESS = ca.SX.sym('EESS') # Battery State of Charge
-
-        if self.settings['powertrain']['isBalancedLap']:
-            self.states = DecisionVariables.addState(self.states, EESS, 'EESS', 'pmguk_total', 1e6, (0, self.settings['powertrain']['DeltaEESSLimit']), 3, (0, 0),  self.initialSolution["DeltaEESS"])
-        else:
-            self.states = DecisionVariables.addState(self.states, EESS, 'EESS', 'pmguk_total', 1e6, (0, self.settings['powertrain']['DeltaEESSLimit']), 0, (0, 0),  self.initialSolution["DeltaEESS"])
+        deltaEESS = ca.SX.sym('deltaEESS') # Battery State of Charge
+        self.states = DecisionVariables.addState(self.states, deltaEESS, 'deltaEESS', 'pmguk_total', 1e6, (self.settings['powertrain']['DeltaEESSLimit'], 0), 2, (0, 0),  self.initialSolution["DeltaEESS"])
 
         # Controls
         der_delta = ca.SX.sym('der_delta')
@@ -304,12 +300,11 @@ class FormulaOne(BaseModel):
         der_psi = dpsi
         power_wheel = (Fx - Fd) * u # Cost of drag power
 
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
-
         # Power at Wheel Constraint
         power_constraint = (pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency'] + pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency']) - power_wheel # Path Constraint
         
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, pmguk_deploy + pmguk_harvest, 'power_battery')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
 
         # Model Path Constraints
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (0, np.inf) )
@@ -361,7 +356,7 @@ class FormulaOne(BaseModel):
         modelFun = FormulaOne()
 
         # Function update parameters and car data based on overrite functions
-        modelFun = modelFun.loadTrackData('src/model/Car/component/dataFiles/FSUK_2023_processed.csv')
+        modelFun = modelFun.loadTrackData('/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/component/dataFiles/FormulaOne/Spielberg.csv')
 
         endPoint = modelFun.settings['track']['sLap'][-1]
         numIntervals = 200 # Number of Phases
@@ -421,6 +416,7 @@ if __name__ == "__main__":
         DebugSim(modelFun, SimOut)
 
     except Exception as e:
+        sol = optiProblem.solve()
         print("Solver failed. Debugging variable values...")
         SimOut = SimOutputs.createDebugOutputDict(optiProblem, modelFun, Xs, Us, Gs)
 
