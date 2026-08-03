@@ -73,7 +73,6 @@ class TrackModel(BaseModel):
 
         # Heading angle from derivative direction
         aTheta = integrate.cumulative_trapezoid(Kt, arc_length, initial=0)
-        aTheta = aTheta + np.arctan2(dy_ds[0], dx_ds[0])  # Adjust initial heading based on the first point
 
         x = integrate.cumulative_trapezoid(np.cos(aTheta), arc_length, initial=0)
         y = integrate.cumulative_trapezoid(np.sin(aTheta), arc_length, initial=0)
