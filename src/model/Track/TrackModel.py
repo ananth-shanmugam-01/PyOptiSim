@@ -5,6 +5,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scienceplots as splt
 from scipy.interpolate import PchipInterpolator
+from scipy.interpolate import UnivariateSpline
+from scipy import integrate
+from scipy.signal import savgol_filter
 
 import tools.DecisionVariables as DecisionVariables
 from model.BaseModel import BaseModel
@@ -29,7 +32,7 @@ python -m model.Track.TrackModel
 
 class TrackModel(BaseModel):
 
-    def ProcessRawTrackData(self, trackFile: str, smoothing_factor: float = 1e5):
+    def ProcessRawTrackData(self, trackFile: str, smoothing_factor: float = 1e2):
         """ Load Track Data from JSON and update model parameters, until then use the values directly"""
 
         trackData = pd.read_csv(trackFile)
@@ -38,31 +41,48 @@ class TrackModel(BaseModel):
 
         trackParams['Kt_smoothing_factor'] = smoothing_factor
 
-        trackParams['xi'] = trackData['# x_m'].values
-        trackParams['yi'] = trackData['y_m'].values
+        # Raw centerline
+        x_raw = trackData["# x_m"].to_numpy()
+        y_raw = trackData["y_m"].to_numpy()
 
-        dx = np.diff(trackParams['xi'], prepend=trackParams['xi'][0])
-        dy = np.diff(trackParams['yi'], prepend=trackParams['yi'][0])
-        dS = np.hypot(dx, dy)
-        sLap = np.cumsum(dS)
+        x_raw = x_raw - x_raw[0]  # Shift x to start from 0
+        y_raw = y_raw - y_raw[0]  # Shift y to start from 0
+        
+        # Calculate Arc-length parameter from raw points
+        dx = np.gradient(x_raw)
+        dy = np.gradient(y_raw)
+        ds = np.hypot(dx, dy)
+        arc_length = np.cumsum(ds)
 
-        x_dot = np.gradient(trackParams['xi'], sLap, edge_order=2)
-        y_dot = np.gradient(trackParams['yi'], sLap, edge_order=2)
-        x_ddot = np.gradient(x_dot, sLap, edge_order=2)
-        y_ddot = np.gradient(y_dot, sLap, edge_order=2)
+        # Resample arc-length to a uniform grid
+        arc_length = np.linspace(arc_length[0], arc_length[-1], 2000)
+        x_raw = PchipInterpolator(np.cumsum(ds), x_raw)(arc_length)
+        y_raw = PchipInterpolator(np.cumsum(ds), y_raw)(arc_length)
 
-        trackParams['Kt'] = (x_dot * y_ddot - y_dot * x_ddot) / (x_dot**2 + y_dot**2)**1.5
+        # Create UnivariateSpline objects for x and y
+        sx = UnivariateSpline(arc_length, x_raw, s=1)
+        sy = UnivariateSpline(arc_length, y_raw, s=1)
 
-        # Calculate mesh distance
-        trackParams['sLap'] = np.cumsum(dS)
+        dx_ds = sx.derivative(1)(arc_length)
+        dx_dds = sx.derivative(2)(arc_length)
+        dy_ds = sy.derivative(1)(arc_length)
+        dy_dds = sy.derivative(2)(arc_length)
 
-        # Calculate heading angle, correct for origin heading angle
-        theta = np.cumsum(trackParams['Kt'] * dS)
-        trackParams['aTheta'] = theta
+        # Curvature from spline derivatives
+        Kt = (dx_ds * dy_dds - dy_ds * dx_dds) / (dx_ds**2 + dy_ds**2) ** 1.5
 
-        # Re-Calculate x and y positions based on corrected heading angle
-        trackParams['xi'] = np.cumsum(dS * np.cos(trackParams['aTheta']))
-        trackParams['yi'] = np.cumsum(dS * np.sin(trackParams['aTheta']))
+        # Heading angle from derivative direction
+        aTheta = integrate.cumulative_trapezoid(Kt, arc_length, initial=0)
+        aTheta = aTheta + np.arctan2(dy_ds[0], dx_ds[0])  # Adjust initial heading based on the first point
+
+        x = integrate.cumulative_trapezoid(np.cos(aTheta), arc_length, initial=0)
+        y = integrate.cumulative_trapezoid(np.sin(aTheta), arc_length, initial=0)
+
+        trackParams["sLap"] = arc_length
+        trackParams["xi"] = x
+        trackParams["yi"] = y
+        trackParams["Kt"] = Kt
+        trackParams["aTheta"] = aTheta
 
         return self.settings.update({'track': trackParams})
 
@@ -79,6 +99,7 @@ class TrackModel(BaseModel):
         initialSolution["aTheta"] = PchipInterpolator(self.settings['track']['sLap'], trackParams['aTheta'])(self.mesh_points)
 
         initialSolution["u"] = np.zeros(len(self.mesh_points))
+        initialSolution["der_u"] = np.zeros(len(self.mesh_points))
 
         self.initialSolution = initialSolution
 
@@ -86,8 +107,11 @@ class TrackModel(BaseModel):
     def createModelFunction(self):
 
         # States
+        u = ca.SX.sym('u') # Curvature Control Freedom
+        self.states = DecisionVariables.addState(self.states, u, 'u', 'der_u', 1, (-0.25, 0.25), 0, (0, 0), self.initialSolution["u"])
+
         Kt = ca.SX.sym('Kt') # Track Curvature (1/m) 
-        self.states = DecisionVariables.addState(self.states, Kt, 'Kt', 'der_Kt', 1, (-0.5, 0.5), 3, (0, 0), self.initialSolution["Kt"])
+        self.states = DecisionVariables.addState(self.states, Kt, 'Kt', 'der_Kt', 1, (-0.5, 0.5), 2, (0, 0), self.initialSolution["Kt"])
 
         aTheta = ca.SX.sym('aTheta') # Track Heading Angle (rad)
         self.states = DecisionVariables.addState(self.states, aTheta, 'aTheta', 'der_aTheta', 1, (-np.inf, np.inf), 0, (0,0), self.initialSolution["aTheta"])
@@ -99,8 +123,8 @@ class TrackModel(BaseModel):
         self.states = DecisionVariables.addState(self.states, yi, 'yi', 'der_y', 100, (-np.inf, np.inf), 0, (0,0), self.initialSolution["yi"])
 
         # Controls
-        u = ca.SX.sym('u') # Curvature Smoothing Factor
-        self.controls = DecisionVariables.addControl(self.controls, u, 'u', 1, (-1, 1), self.initialSolution["u"])
+        der_u = ca.SX.sym('der_u') # Curvature Smoothing Factor
+        self.controls = DecisionVariables.addControl(self.controls, der_u, 'der_u', 1, (-1, 1), self.initialSolution["der_u"])
 
         # Parameters
         x_ref = ca.SX.sym('x_ref') # Reference X Position (m)
@@ -117,63 +141,13 @@ class TrackModel(BaseModel):
         Sf = 1 # Scaling Factor = 1
 
         rhs = ca.SX.sym('rhs', self.states.num_x)
-        rhs[0] = u
-        rhs[1] = Kt
-        rhs[2] = ca.cos(aTheta)
-        rhs[3] = ca.sin(aTheta)
+        rhs[0] = der_u
+        rhs[1] = u
+        rhs[2] = Kt
+        rhs[3] = ca.cos(aTheta)
+        rhs[4] = ca.sin(aTheta)
 
-        cost = (x_ref - xi)**2 + (y_ref - yi)**2 + c * u**2
+        cost = ((x_ref - xi)/100)**2 + ((y_ref - yi)/100)**2 + (c*u)**2
 
         # Model Function
         self.modelFunction = ca.Function('f', [self.states.sym, self.controls.sym, self.parameters.sym], [rhs, cost, self.path_constraints.sym, self.auxiliary_outputs.sym],['x', 'u', 'g'], ['rhs', 'cost', 'path_constraints', 'auxiliary_outputs'])
-
-
-if __name__ == "__main__":
-
-
-    # Raw Track Data File Path
-    fp = "/Users/ananthshanmugam/Desktop/GitHub/racetrack-database/racelines/Budapest.csv"
-    # print(pd.read_csv(fp).columns)  # Display the column names of the CSV file
-
-
-    # IPOPT Settings
-    p_opts = {}
-    s_opts = {"max_iter": 1000, 
-            "tol" : 1e-6,
-            "acceptable_tol": 1e-4,
-            "constr_viol_tol": 1e-3,
-            "compl_inf_tol": 1e-3,
-            "nlp_scaling_method": 'gradient-based',}
-    
-    modelFun = TrackModel()
-
-    modelFun.ProcessRawTrackData(fp, smoothing_factor=1e5)
-
-    endPoint = modelFun.settings['track']['sLap'][-1]
-    numIntervals = 400 # Number of Phases
-
-    modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
-    modelFun.createMesh(endPoint, numIntervals)
-    modelFun.createInitialSolution(modelFun.settings['track'])
-    modelFun.createModelFunction()
-
-    optiProblem, Xs, Us, Gs = OptiProblem.createOptiProblem(modelFun)
-    optiProblem.solver('ipopt', p_opts, s_opts)
-    sol = optiProblem.solve()
-
-    SimOutputs.createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, '/Users/ananthshanmugam/Desktop/SimResults/TrackMaking', 'Budapest.csv')
-
-    # Load Results for Plotting
-    results = pd.read_csv('/Users/ananthshanmugam/Desktop/SimResults/TrackMaking/Budapest.csv')
-
-    # Plotting
-    plt.style.use('science')
-    plt.figure(figsize=(10, 6))
-    plt.plot(results['sLap'], results['Kt'], label='Optimized Curvature', color='green')
-    plt.plot(modelFun.settings['track']['sLap'], modelFun.settings['track']['Kt'], label='Original Curvature', color='orange', linestyle='--')
-    plt.title('Track Curvature Optimization Results')
-    plt.xlabel('Arc Length (m)')
-    plt.ylabel('Curvature (1/m)')
-    plt.legend()
-    plt.grid()
-    plt.show()

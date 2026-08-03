@@ -5,26 +5,18 @@ import os
 
 if __name__ == "__main__":
 
-    base_results_path = '/Users/ananthshanmugam/Desktop/SimResults/TrackMaking/Budapest/'
+    base_trackmap = pd.read_csv('/Users/ananthshanmugam/Desktop/GitHub/racetrack-database/racelines/Austin.csv')
+    smoothed_trackmap = pd.read_csv('/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/component/dataFiles/FormulaOne/Austin.csv')
     # e.g. /Users/ananthshanmugam/Desktop/SimResults/TrackMaking/Budapest/1e3.csv
-
-    # Find file names in this folder
-    files = os.listdir(os.path.dirname(base_results_path))
-
-    results = dict()  # Dictionary to hold results for each file
-    for file in files:
-        if file.endswith('.csv'):
-            print(f"Loading results from {file}...")
-            results[file] = pd.read_csv(f'{base_results_path}/{file}')
 
     # Plotting
     plt.style.use('science')
     plt.figure(figsize=(10, 6))
-    for label, df in results.items():
-        plt.plot(df['sLap'], df['Kt'], label=label)
-    plt.title('Track Curvature Optimization Results')
-    plt.xlabel('Arc Length (m)')
-    plt.ylabel('Curvature (1/m)')
+    plt.plot(base_trackmap['# x_m'], base_trackmap['y_m'], label='Base Track')
+    plt.plot(smoothed_trackmap['xi'], smoothed_trackmap['yi'], label='Smoothed Track')
+    plt.title('Track Map Comparison')
+    plt.xlabel('X Position (m)')
+    plt.ylabel('Y Position (m)')
     plt.legend()
     plt.grid()
     plt.show()

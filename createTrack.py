@@ -60,7 +60,7 @@ for track_name, track_fp in tracklist_fp.items():
     # Process Raw Track Data
     modelFun.ProcessRawTrackData(os.path.join(raw_data_base_fp, track_fp))
     endPoint = modelFun.settings['track']['sLap'][-1]
-    numIntervals = 4000 # Number of Phases
+    numIntervals = 1000 # Number of Phases
 
     modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
     modelFun.createMesh(endPoint, numIntervals)
