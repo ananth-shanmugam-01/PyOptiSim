@@ -53,11 +53,11 @@ class FormulaOne(BaseModel):
         params['powertrain'] = dict()
         params['powertrain']['kDifferential'] = 10.47 # Nms/rad - differential friction coefficient
         params['powertrain']['PMGUKDeployMax'] = 120e3 # Maximum Deployment MGUK Power in W
-        params['powertrain']['PMGUKHarvestMax'] = -120e3 # Maximum Harvest MGUK Power in W
-        params['powertrain']['DeltaEESSLimit'] = -4e6 # Battery Pack Range - SoC Delta limits from Max to Min in J
-        params['powertrain']['isBalancedLap'] = True # If True, the battery SoC at the end of the lap is equal to the start of the lap
-        params['powertrain']['EMGUKHarvestLimit'] = -8e6 # Maximum Allowable Harvest Energy from MGUK in J
+        params['powertrain']['PMGUKHarvestMax'] = -350e3 # Maximum Harvest MGUK Power in W
+        params['powertrain']['DeltaSoCLimit'] = 8e6 # Battery Pack Range - SoC Delta limits from Max to Min in J
+        params['powertrain']['EMGUKHarvestMax'] = 8e6 # Maximum Harvest MGUK Power at the Battery in W
         params['powertrain']['rBatteryEfficiency'] = 0.95 # Round Trip Battery Efficiency
+        params['powertrain']['vCarLimit'] = 150 # m/s - default for unconstrained
 
         # Tyre Parameters
         params['tyre'] = dict()
@@ -73,8 +73,8 @@ class FormulaOne(BaseModel):
         params['tyre']['peak_muy_slip_load_2'] = np.radians(8) # radians
         params['tyre']['longitudinal_shape_factor'] = 1.9
         params['tyre']['lateral_shape_factor']  = 1.7 
-        params['tyre']['lateral_grip_scalar'] = 1.0
-        params['tyre']['longitudinal_grip_scalar'] = 1.0
+        params['tyre']['lateral_grip_scalar'] = 1
+        params['tyre']['longitudinal_grip_scalar'] = 1
 
         # Calculated Parameters
         params['chassis']['frontLeverArm'] = (1- params['chassis']['weightDistribution']) * params['chassis']['wheelbase'] # m
@@ -108,11 +108,15 @@ class FormulaOne(BaseModel):
         # Interpolate to Main Mesh 
         initialSolution = dict()
 
+        # Fixed Value for Longitudinal Velocity Initial Solution
+        u_init = 10 # m/s
+        t_end_init = self.settings['track']['sLap'][-1] / u_init # s
+
         # Initial Solution for States
-        initialSolution["t"] = np.linspace(0, 100, len(self.mesh_points)) # s
+        initialSolution["t"] = np.linspace(0, t_end_init, len(self.mesh_points)) # s
         initialSolution["n"] = np.zeros(len(self.mesh_points))
         initialSolution["xi"] = np.zeros(len(self.mesh_points))
-        initialSolution["u"] = 5 * np.ones(len(self.mesh_points)) # m/s
+        initialSolution["u"] = u_init * np.ones(len(self.mesh_points)) # m/s
         initialSolution["v"] = np.zeros(len(self.mesh_points)) # m/s
         initialSolution["dpsi"] = np.zeros(len(self.mesh_points)) # rad/s
         initialSolution["x_ir"] = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['xi'])(self.mesh_points) # m - track x-coordinates
@@ -124,7 +128,7 @@ class FormulaOne(BaseModel):
         initialSolution["acc_x"] = np.zeros(len(self.mesh_points)) # m/s^2
         initialSolution["acc_y"] = np.zeros(len(self.mesh_points)) # m/s^2
         initialSolution["pmguk"] = np.zeros(len(self.mesh_points)) # W
-        initialSolution["DeltaEESS"] = np.zeros(len(self.mesh_points)) # J
+        initialSolution["DeltaSoC"] = np.zeros(len(self.mesh_points)) # J
 
         # Initial Solution for Controls
         initialSolution["der_delta"] = np.zeros(len(self.mesh_points))
@@ -149,7 +153,7 @@ class FormulaOne(BaseModel):
         self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 1, (np.radians(-4), np.radians(4)), 3, (0, 0), self.initialSolution["xi"] )
 
         u = ca.SX.sym('u')         # vehicle fixed x-velocity (m/s)
-        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, 120), 3, (10, 0), self.initialSolution["u"] )
+        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, self.settings['powertrain']['vCarLimit']), 3, (0, 0), self.initialSolution["u"] )
 
         v = ca.SX.sym('v')         # vehicle fixed y-velocity (m/s)
         self.states = DecisionVariables.addState(self.states, v, 'v', 'accy', 10, (-1e2, 1e2), 3, (0, 0),  self.initialSolution["v"])
@@ -158,16 +162,16 @@ class FormulaOne(BaseModel):
         self.states = DecisionVariables.addState(self.states, dpsi, 'dpsi', 'der_dpsi', 10, (-1e3, 1e3), 3, (0, 0), self.initialSolution["dpsi"]) 
 
         x_ir = ca.SX.sym('x_ir')   # x-Position in global coordinates (m)
-        self.states = DecisionVariables.addState(self.states, x_ir, 'x_ir', 'der_x_ir', 100, (-20000, 20000), 0, (self.settings['track']['xi'][0],  self.settings['track']['xi'][-1]), self.initialSolution["x_ir"]) 
+        self.states = DecisionVariables.addState(self.states, x_ir, 'x_ir', 'der_x_ir', 1000, (-2000, 2000), 1, (self.settings['track']['xi'][0],  self.settings['track']['xi'][-1]), self.initialSolution["x_ir"]) 
 
         y_ir = ca.SX.sym('y_ir')   # y-Position in global coordinates (m)
-        self.states = DecisionVariables.addState(self.states, y_ir, 'y_ir', 'der_y_ir', 100, (-20000, 20000), 0, (self.settings['track']['yi'][0],  self.settings['track']['yi'][-1]), self.initialSolution["y_ir"])     
-        
+        self.states = DecisionVariables.addState(self.states, y_ir, 'y_ir', 'der_y_ir', 1000, (-2000, 2000), 1, (self.settings['track']['yi'][0],  self.settings['track']['yi'][-1]), self.initialSolution["y_ir"])     
+
         psi = ca.SX.sym('psi')     # yaw angle (rad)
-        self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 1, (-200, 200), 1, (self.settings['track']['theta'][0], self.settings['track']['theta'][-1]),  self.initialSolution["psi"])     
+        self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 10, (-10, 10), 1, (self.settings['track']['theta'][0], self.settings['track']['theta'][-1]),  self.initialSolution["psi"])     
 
         delta = ca.SX.sym('delta')  # steering angle (rad)
-        self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-30), np.radians(30)), 3, (0, 0),  self.initialSolution["delta"])     
+        self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-20), np.radians(20)), 3, (0, 0),  self.initialSolution["delta"])     
 
         Sxfl = ca.SX.sym('Sxfl')      # front left long. slip (-)
         self.states = DecisionVariables.addState(self.states, Sxfl, 'Sxfl', 'der_Sxfl', 1, (-0.15, 0), 3, (0, 0),  self.initialSolution["Sxf"]) 
@@ -188,13 +192,16 @@ class FormulaOne(BaseModel):
         self.states = DecisionVariables.addState(self.states, acc_y, 'acc_y', 'der_acc_y', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_y"]) 
 
         pmguk_deploy = ca.SX.sym('pmguk_deploy') # MGUK Deploy Power at the Wheel (W)
-        self.states = DecisionVariables.addState(self.states, pmguk_deploy, 'pmguk_deploy', 'der_pmguk_deploy', 1e6, (0, self.settings['powertrain']['PMGUKDeployMax']), 0, (0, 0), self.initialSolution["pmguk"]) 
+        self.states = DecisionVariables.addState(self.states, pmguk_deploy, 'pmguk_deploy', 'der_pmguk_deploy', 1e6, (0, self.settings['powertrain']['PMGUKDeployMax']), 3, (0, 0), self.initialSolution["pmguk"]) 
 
         pmguk_harvest = ca.SX.sym('pmguk_harvest') # MGUK Harvest Power at the Wheel (W)
-        self.states = DecisionVariables.addState(self.states, pmguk_harvest, 'pmguk_harvest', 'der_pmguk_harvest', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], 0), 0, (0, 0), self.initialSolution["pmguk"]) 
+        self.states = DecisionVariables.addState(self.states, pmguk_harvest, 'pmguk_harvest', 'der_pmguk_harvest', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], 0), 3, (0, 0), self.initialSolution["pmguk"]) 
 
-        deltaEESS = ca.SX.sym('deltaEESS') # Battery State of Charge
-        self.states = DecisionVariables.addState(self.states, deltaEESS, 'deltaEESS', 'pmguk_total', 1e6, (self.settings['powertrain']['DeltaEESSLimit'], 0), 2, (0, 0),  self.initialSolution["DeltaEESS"])
+        DeltaSoC = ca.SX.sym('DeltaSoC') # Battery State of Charge Delta from Start of Lap (J) - Free Boundary Conditions, as long as it is within the prescribed window
+        self.states = DecisionVariables.addState(self.states, DeltaSoC, 'DeltaSoC', 'pmguk_battery', 1e6, (0, self.settings['powertrain']['DeltaSoCLimit']), 0, (0, 0),  self.initialSolution["DeltaSoC"]) 
+
+        # EMGUKHarvest = ca.SX.sym('EMGUKHarvest') # MGUK Harvest Energy at the Battery (J) - Starts at Zero
+        # self.states = DecisionVariables.addState(self.states, EMGUKHarvest, 'EMGUKHarvest', 'pmguk_harvest', 1e6, (-1e6, self.settings['powertrain']['EMGUKHarvestMax']), 1, (0, 0),  self.initialSolution["DeltaSoC"]) 
 
         # Controls
         der_delta = ca.SX.sym('der_delta')
@@ -213,10 +220,10 @@ class FormulaOne(BaseModel):
         self.controls = DecisionVariables.addControl(self.controls, der_Sxrr, 'der_Sxrr', 1, (-10, 10), self.initialSolution["der_Sxr"])
 
         der_pmguk_deploy = ca.SX.sym('der_pmguk_deploy')
-        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_deploy, 'der_pmguk_deploy', 1e6, (-500e3, 500e3), self.initialSolution["der_pmguk"])
+        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_deploy, 'der_pmguk_deploy', 1e6, (-1e6, 1e6), self.initialSolution["der_pmguk"])
 
         der_pmguk_harvest = ca.SX.sym('der_pmguk_harvest')
-        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_harvest, 'der_pmguk_harvest', 1e6, (-500e3, 500e3), self.initialSolution["der_pmguk"])
+        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_harvest, 'der_pmguk_harvest', 1e6, (-1e6, 1e6), self.initialSolution["der_pmguk"])
 
         # Parameters
         curv = ca.SX.sym('curv')
@@ -291,8 +298,8 @@ class FormulaOne(BaseModel):
         der_n = (u*ca.sin(xi) + v*ca.cos(xi))
         der_xi = Sf * dpsi - curv
 
-        der_acc_x = (-Fx + self.settings['chassis']['mass'] * acc_x)/(self.settings['chassis']['mass'] * 0.1)
-        der_acc_y = (Fy - self.settings['chassis']['mass'] * acc_y)/(self.settings['chassis']['mass'] * 0.1)
+        der_acc_x = (-Fx + self.settings['chassis']['mass'] * acc_x)/(self.settings['chassis']['mass'] * 0.01)
+        der_acc_y = (Fy - self.settings['chassis']['mass'] * acc_y)/(self.settings['chassis']['mass'] * 0.01)
 
         der_dpsi = Mz / self.settings['chassis']['Izz']
         der_x_ir = ( u * ca.cos(psi) - v * ca.sin(psi) )
@@ -300,11 +307,12 @@ class FormulaOne(BaseModel):
         der_psi = dpsi
         power_wheel = (Fx - Fd) * u # Cost of drag power
 
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
+
         # Power at Wheel Constraint
         power_constraint = (pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency'] + pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency']) - power_wheel # Path Constraint
         
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, pmguk_deploy + pmguk_harvest, 'power_battery')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
 
         # Model Path Constraints
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (0, np.inf) )
@@ -321,7 +329,7 @@ class FormulaOne(BaseModel):
         rhs[1] = Sf * der_n
         rhs[2] = der_xi
         rhs[3] = Sf * (dpsi*v + acc_x)
-        rhs[4] = Sf * (-dpsi*u + acc_y) 
+        rhs[4] = Sf * (-dpsi*u + acc_y)
         rhs[5] = Sf * der_dpsi
         rhs[6] = Sf * der_x_ir
         rhs[7] = Sf * der_y_ir
@@ -335,7 +343,8 @@ class FormulaOne(BaseModel):
         rhs[15] = Sf * der_acc_y
         rhs[16] = Sf * der_pmguk_deploy
         rhs[17] = Sf * der_pmguk_harvest
-        rhs[18] = Sf * (-pmguk_deploy / self.settings['powertrain']['rBatteryEfficiency'] - pmguk_harvest * self.settings['powertrain']['rBatteryEfficiency'])
+        rhs[18] = Sf * -1 * (pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency'] + pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency']) # Deploy results in battery depletion, harvest results in battery charge
+        # rhs[19] = Sf * -1 * pmguk_harvest # Harvest results in battery charge
 
         # Stage Cost
         cost = ( Sf
@@ -344,8 +353,9 @@ class FormulaOne(BaseModel):
                 + ( 0.0005 * der_Sxfr**2 )
                 + ( 0.0005 * der_Sxrl**2 )
                 + ( 0.0005 * der_Sxrr**2 )
-                + ( 1e-9 * der_pmguk_deploy)**2 
-                + ( 1e-9 * der_pmguk_harvest)**2
+                + ( 1e-14 * der_pmguk_deploy)**2
+                + ( 1e-14 * der_pmguk_harvest)**2
+                # + ( 1e-18 * (pmguk_deploy * pmguk_harvest)**2 )
             )
 
         # Model Function
@@ -359,7 +369,7 @@ class FormulaOne(BaseModel):
         modelFun = modelFun.loadTrackData('/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/component/dataFiles/FormulaOne/Spielberg.csv')
 
         endPoint = modelFun.settings['track']['sLap'][-1]
-        numIntervals = 200 # Number of Phases
+        numIntervals = 300 # Number of Phases
 
         modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
         modelFun.createMesh(endPoint, numIntervals)
@@ -377,27 +387,18 @@ class FormulaOne(BaseModel):
 
 if __name__ == "__main__":
 
+    # Simulation Settings
+    sim_output_path = '/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/tests'
+    sim_name = 'Baseline_FormulaOne_Spielberg'
+
     # IPOPT Settings
     p_opts = {}
-    s_opts = {"max_iter": 1000, 
+    s_opts = {"max_iter": 200, 
         "tol" : 1e-6,
         "acceptable_tol": 1e-4,
         "constr_viol_tol": 1e-3,
         "compl_inf_tol": 1e-3,
         "nlp_scaling_method": 'gradient-based',}
-    # s_opts = {"max_iter": 1000, 
-    #         "tol" : 1e-4,
-    #         "acceptable_tol": 1e-2,
-    #         "constr_viol_tol": 1e-3,
-    #         "acceptable_constr_viol_tol": 1e-2,
-    #         "compl_inf_tol": 1e-3,
-    #         "dual_inf_tol": 1e-1,
-    #         "acceptable_dual_inf_tol": 1e2,
-    #         "nlp_scaling_method": 'gradient-based',
-    #         "mu_strategy": 'adaptive',
-    #         "mu_init": 1e-4,
-    #         "mu_target": 1e-6,
-    #         "mu_min": 1e-6,}
 
     # Generic Optimal Control Sim
 
@@ -407,17 +408,7 @@ if __name__ == "__main__":
 
     # Solve
     optiProblem.solver('ipopt',p_opts,s_opts)
-    try:
-        sol = optiProblem.solve()
-        print("Solver succeeded.")
-        # Assigning Values to Dict
-        SimOut = SimOutputs.createOutputDict(optiProblem, modelFun, Xs, Us, Gs)
 
-        DebugSim(modelFun, SimOut)
-
-    except Exception as e:
-        sol = optiProblem.solve()
-        print("Solver failed. Debugging variable values...")
-        SimOut = SimOutputs.createDebugOutputDict(optiProblem, modelFun, Xs, Us, Gs)
-
-        DebugSim(modelFun, SimOut)
+    sol = optiProblem.solve()
+    SimOut = SimOutputs.createDebugOutputDict(optiProblem, modelFun, Xs, Us, Gs)
+    SimOutputs.createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, sim_output_path, f'{sim_name}.csv')

@@ -43,7 +43,7 @@ for sim_name, sim_params in sim_groups.items():
     # Instantiate Model
     modelFun = CarModel()
 
-    modelFun = modelFun.loadTrackData('src/model/Car/component/dataFiles/FSUK_2023_processed.csv')
+    modelFun = modelFun.loadTrackData('/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/component/dataFiles/FormulaStudent/FSUK_2023_processed.csv')
     print(modelFun.settings['track']['sLap'])
 
     endPoint = modelFun.settings['track']['sLap'][-1]

@@ -104,11 +104,15 @@ class FormulaStudent(BaseModel):
         # Interpolate to Main Mesh 
         initialSolution = dict()
 
+        # Fixed Value for Longitudinal Velocity Initial Solution
+        u_init = 5 # m/s
+        t_end_init = self.settings['track']['sLap'][-1] / u_init # s
+
         # Initial Solution for States
-        initialSolution["t"] = np.linspace(0, 100, len(self.mesh_points)) # s
+        initialSolution["t"] = np.linspace(0, t_end_init, len(self.mesh_points)) # s
         initialSolution["n"] = np.zeros(len(self.mesh_points))
         initialSolution["xi"] = np.zeros(len(self.mesh_points))
-        initialSolution["u"] = 5 * np.ones(len(self.mesh_points)) # m/s
+        initialSolution["u"] = u_init * np.ones(len(self.mesh_points)) # m/s
         initialSolution["v"] = np.zeros(len(self.mesh_points)) # m/s
         initialSolution["dpsi"] = np.zeros(len(self.mesh_points)) # rad/s
         initialSolution["x_ir"] = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['xi'])(self.mesh_points) # m - track x-coordinates
@@ -353,8 +357,7 @@ class FormulaStudent(BaseModel):
         modelFun = FormulaStudent()
 
         # Function update parameters and car data based on overrite functions
-        modelFun = modelFun.loadTrackData('src/model/Car/component/dataFiles/FSUK_2023_processed.csv')
-
+        modelFun = modelFun.loadTrackData('/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/component/dataFiles/FormulaStudent/FSUK_2023_processed.csv')
         endPoint = modelFun.settings['track']['sLap'][-1]
         numIntervals = 200 # Number of Phases
 
@@ -376,25 +379,12 @@ if __name__ == "__main__":
 
     # IPOPT Settings
     p_opts = {}
-    s_opts = {"max_iter": 1000, 
-        "tol" : 1e-6,
-        "acceptable_tol": 1e-4,
-        "constr_viol_tol": 1e-3,
-        "compl_inf_tol": 1e-3,
-        "nlp_scaling_method": 'gradient-based',}
-    # s_opts = {"max_iter": 1000, 
-    #         "tol" : 1e-4,
-    #         "acceptable_tol": 1e-2,
-    #         "constr_viol_tol": 1e-3,
-    #         "acceptable_constr_viol_tol": 1e-2,
-    #         "compl_inf_tol": 1e-3,
-    #         "dual_inf_tol": 1e-1,
-    #         "acceptable_dual_inf_tol": 1e2,
-    #         "nlp_scaling_method": 'gradient-based',
-    #         "mu_strategy": 'adaptive',
-    #         "mu_init": 1e-4,
-    #         "mu_target": 1e-6,
-    #         "mu_min": 1e-6,}
+    s_opts = {"max_iter": 100, 
+            "tol" : 1e-6,
+            "acceptable_tol": 1e-4,
+            "constr_viol_tol": 1e-3,
+            "compl_inf_tol": 1e-3,
+            "nlp_scaling_method": 'gradient-based',}
 
     # Generic Optimal Control Sim
 
@@ -408,9 +398,7 @@ if __name__ == "__main__":
         sol = optiProblem.solve()
         print("Solver succeeded.")
         # Assigning Values to Dict
-        SimOut = SimOutputs.createOutputDict(optiProblem, modelFun, Xs, Us, Gs)
-
-        DebugSim(modelFun, SimOut)
+        SimOutputs.createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, sim_output_path, f'TestSim.csv')
 
     except Exception as e:
         print("Solver failed. Debugging variable values...")
