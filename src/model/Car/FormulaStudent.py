@@ -4,22 +4,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import PchipInterpolator
 
-import src.tools.DecisionVariables as DecisionVariables
+import tools.DecisionVariables as DecisionVariables
 
-from src.model.BaseModel import BaseModel
-from src.model.Car.component.simpleTyre import simpleTyre as simpleTyre
-from src.model.Car.component.track import loadTrackData, createSimpleTrack
+from model.BaseModel import BaseModel
+from model.Car.component.simpleTyre import simpleTyre as simpleTyre
 
 # Transcription
-import src.tools.OptiProblem as OptiProblem
+import tools.OptiProblem as OptiProblem
 
 # Post Processing
-import src.tools.SimOutputs as SimOutputs
+import tools.SimOutputs as SimOutputs
 
 # Sim Debugging
-from src.tools.DebugSim import DebugSim
+from tools.DebugSim import DebugSim
 
-class CarModel(BaseModel):
+class FormulaStudent(BaseModel):
 
     def loadCarData(self):
         """ Load Car Data from JSON and update model parameters, until then use the values directly"""
@@ -51,8 +50,10 @@ class CarModel(BaseModel):
         # Powertrain Parameters
         params['powertrain'] = dict()
         params['powertrain']['PMGUKDeployMax'] = 80e3 # Maximum Deployment MGUK Power in W
-        params['powertrain']['PMGUKHarvestMax'] = 40e3 # Maximum Harvest MGUK Power in W
-        params['powertrain']['EESSCapacity'] = 5.8 * 3.6e6 / 22 # Battery Pack Range in J from kWh - 5.8 kWh pack over 22 laps
+        params['powertrain']['PMGUKHarvestMax'] = -10e3 # Maximum Harvest MGUK Power in W
+        params['powertrain']['DeltaSoCLimit'] = -5.8 * 3.6e6 / 22 # Allowable SoC Delta given battery capacity in J from kWh - 5.8 kWh pack over 22 laps
+        params['powertrain']['rBatteryEfficiency'] = 0.95 # Round Trip Battery Efficiency
+        params['powertrain']['vCarLimit'] = 150 # m/s - default for unconstrained
 
         # Tyre Parameters
         params['tyre'] = dict()
@@ -79,16 +80,39 @@ class CarModel(BaseModel):
         
         self.settings.update(params)
 
+        return self
+
+    def loadTrackData(self, trackFile: str): 
+        """ Load Track Data from JSON and update model parameters, until then use the values directly"""
+
+        trackData = pd.read_csv(trackFile)
+
+        params = dict()
+        params['track'] = dict()
+        params['track']['sLap'] = trackData['sLap'].to_numpy()
+        params['track']['curv'] = trackData['curv'].to_numpy()
+        params['track']['theta'] = trackData['theta'].to_numpy()
+        params['track']['xi'] = trackData['xi'].to_numpy()
+        params['track']['yi'] = trackData['yi'].to_numpy()
+
+        self.settings.update(params)
+
+        return self
+
     def createInitialSolution(self):
 
         # Interpolate to Main Mesh 
         initialSolution = dict()
 
+        # Fixed Value for Longitudinal Velocity Initial Solution
+        u_init = 5 # m/s
+        t_end_init = self.settings['track']['sLap'][-1] / u_init # s
+
         # Initial Solution for States
-        initialSolution["t"] = np.linspace(0, 100, len(self.mesh_points)) # s
+        initialSolution["t"] = np.linspace(0, t_end_init, len(self.mesh_points)) # s
         initialSolution["n"] = np.zeros(len(self.mesh_points))
         initialSolution["xi"] = np.zeros(len(self.mesh_points))
-        initialSolution["u"] = 5 * np.ones(len(self.mesh_points)) # m/s
+        initialSolution["u"] = u_init * np.ones(len(self.mesh_points)) # m/s
         initialSolution["v"] = np.zeros(len(self.mesh_points)) # m/s
         initialSolution["dpsi"] = np.zeros(len(self.mesh_points)) # rad/s
         initialSolution["x_ir"] = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['xi'])(self.mesh_points) # m - track x-coordinates
@@ -100,7 +124,7 @@ class CarModel(BaseModel):
         initialSolution["acc_x"] = np.zeros(len(self.mesh_points)) # m/s^2
         initialSolution["acc_y"] = np.zeros(len(self.mesh_points)) # m/s^2
         initialSolution["pmguk"] = np.zeros(len(self.mesh_points)) # W
-        initialSolution["EESS"] = np.zeros(len(self.mesh_points)) # J
+        initialSolution["DeltaSoC"] = np.zeros(len(self.mesh_points)) # J
 
         # Initial Solution for Controls
         initialSolution["der_delta"] = np.zeros(len(self.mesh_points))
@@ -125,7 +149,7 @@ class CarModel(BaseModel):
         self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 1, (np.radians(-4), np.radians(4)), 3, (0, 0), self.initialSolution["xi"] )
 
         u = ca.SX.sym('u')         # vehicle fixed x-velocity (m/s)
-        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, 150), 3, (10, 0), self.initialSolution["u"] )
+        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, self.settings['powertrain']['vCarLimit']), 3, (10, 0), self.initialSolution["u"] )
 
         v = ca.SX.sym('v')         # vehicle fixed y-velocity (m/s)
         self.states = DecisionVariables.addState(self.states, v, 'v', 'accy', 10, (-1e2, 1e2), 3, (0, 0),  self.initialSolution["v"])
@@ -140,7 +164,7 @@ class CarModel(BaseModel):
         self.states = DecisionVariables.addState(self.states, y_ir, 'y_ir', 'der_y_ir', 100, (-20000, 20000), 0, (self.settings['track']['yi'][0],  self.settings['track']['yi'][-1]), self.initialSolution["y_ir"])     
         
         psi = ca.SX.sym('psi')     # yaw angle (rad)
-        self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 1, (-200, 200), 0, (0, 0),  self.initialSolution["psi"])     
+        self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 1, (-200, 200), 1, (self.settings['track']['theta'][0], self.settings['track']['theta'][-1]),  self.initialSolution["psi"])     
 
         delta = ca.SX.sym('delta')  # steering angle (rad)
         self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-30), np.radians(30)), 3, (0, 0),  self.initialSolution["delta"])     
@@ -163,11 +187,14 @@ class CarModel(BaseModel):
         acc_y = ca.SX.sym('acc_y') # lateral acceleration (m/s^2)
         self.states = DecisionVariables.addState(self.states, acc_y, 'acc_y', 'der_acc_y', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_y"]) 
 
-        # pmguk = ca.SX.sym('pmguk') # MGUK Deploy Power at the Wheel (W)
-        # self.states = DecisionVariables.addState(self.states, pmguk, 'pmguk', 'der_pmguk', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], self.settings['powertrain']['PMGUKDeployMax']), 0, (0, 0), self.initialSolution["pmguk"]) 
+        pmguk_deploy = ca.SX.sym('pmguk_deploy') # MGUK Deploy Power at the Wheel (W)
+        self.states = DecisionVariables.addState(self.states, pmguk_deploy, 'pmguk_deploy', 'der_pmguk_deploy', 1e6, (0, self.settings['powertrain']['PMGUKDeployMax']), 0, (0, 0), self.initialSolution["pmguk"]) 
 
-        # EESS = ca.SX.sym('EESS') # Battery State of Charge (J)
-        # self.states = DecisionVariables.addState(self.states, EESS, 'EESS', 'pmguk', 1e6, (0, self.settings['powertrain']['EESSCapacity']), 1, (0, 0),  self.initialSolution["EESS"]) 
+        pmguk_harvest = ca.SX.sym('pmguk_harvest') # MGUK Harvest Power at the Wheel (W)
+        self.states = DecisionVariables.addState(self.states, pmguk_harvest, 'pmguk_harvest', 'der_pmguk_harvest', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], 0), 0, (0, 0), self.initialSolution["pmguk"]) 
+
+        DeltaSoC = ca.SX.sym('DeltaSoC') # Battery State of Charge Delta from Start of Lap (J)
+        self.states = DecisionVariables.addState(self.states, DeltaSoC, 'DeltaSoC', 'pmguk', 1e6, (self.settings['powertrain']['DeltaSoCLimit'], 1e6), 1, (0, 0),  self.initialSolution["DeltaSoC"]) 
 
         # Controls
         der_delta = ca.SX.sym('der_delta')
@@ -185,9 +212,12 @@ class CarModel(BaseModel):
         der_Sxrr = ca.SX.sym('der_Sxrr')
         self.controls = DecisionVariables.addControl(self.controls, der_Sxrr, 'der_Sxrr', 1, (-10, 10), self.initialSolution["der_Sxr"])
 
-        # der_pmguk = ca.SX.sym('der_pmguk')
-        # self.controls = DecisionVariables.addControl(self.controls, der_pmguk, 'der_pmguk', 1, (-500e3, 500e3), self.initialSolution["der_pmguk"])
-        
+        der_pmguk_deploy = ca.SX.sym('der_pmguk_deploy')
+        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_deploy, 'der_pmguk_deploy', 1e6, (-500e3, 500e3), self.initialSolution["der_pmguk"])
+
+        der_pmguk_harvest = ca.SX.sym('der_pmguk_harvest')
+        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_harvest, 'der_pmguk_harvest', 1e6, (-500e3, 500e3), self.initialSolution["der_pmguk"])
+
         # Parameters
         curv = ca.SX.sym('curv')
         curv_interp = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['curv']) (self.mesh_points)
@@ -273,9 +303,12 @@ class CarModel(BaseModel):
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
 
         # Power at Wheel Constraint
-        power_constraint = power_wheel - self.settings['powertrain']['PMGUKDeployMax']
+        power_constraint = (pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency'] + pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency']) - power_wheel # Path Constraint
+        
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, pmguk_deploy + pmguk_harvest, 'power_battery')
+
         # Model Path Constraints
-        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (-np.inf, 0) )
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (0, np.inf) )
 
         # Non-Negative Wheel Loads
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_fl, 'Fz_fl_constraint', 1e4, (0, np.inf) )
@@ -301,8 +334,9 @@ class CarModel(BaseModel):
         rhs[13] = Sf * der_Sxrr
         rhs[14] = Sf * der_acc_x
         rhs[15] = Sf * der_acc_y
-        # rhs[14] = Sf * der_pmguk
-        # rhs[15] = Sf * -pmguk
+        rhs[16] = Sf * der_pmguk_deploy
+        rhs[17] = Sf * der_pmguk_harvest
+        rhs[18] = Sf * (-pmguk_deploy / self.settings['powertrain']['rBatteryEfficiency'] - pmguk_harvest * self.settings['powertrain']['rBatteryEfficiency'])
 
         # Stage Cost
         cost = ( Sf
@@ -311,7 +345,8 @@ class CarModel(BaseModel):
                 + ( 0.0005 * der_Sxfr**2 )
                 + ( 0.0005 * der_Sxrl**2 )
                 + ( 0.0005 * der_Sxrr**2 )
-                # + ( 1e-9 * der_pmguk**2 )
+                + ( 1e-9 * der_pmguk_deploy)**2 
+                + ( 1e-9 * der_pmguk_harvest)**2
             )
 
         # Model Function
@@ -319,11 +354,10 @@ class CarModel(BaseModel):
 
     def factory():
         
-        modelFun = CarModel()
+        modelFun = FormulaStudent()
 
         # Function update parameters and car data based on overrite functions
-        modelFun = loadTrackData(modelFun, 'src/model/Car/component/dataFiles/FSUK_2023_processed.csv')
-
+        modelFun = modelFun.loadTrackData('/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/component/dataFiles/FormulaStudent/FSUK_2023_processed.csv')
         endPoint = modelFun.settings['track']['sLap'][-1]
         numIntervals = 200 # Number of Phases
 
@@ -345,29 +379,16 @@ if __name__ == "__main__":
 
     # IPOPT Settings
     p_opts = {}
-    s_opts = {"max_iter": 1000, 
-        "tol" : 1e-6,
-        "acceptable_tol": 1e-4,
-        "constr_viol_tol": 1e-3,
-        "compl_inf_tol": 1e-3,
-        "nlp_scaling_method": 'gradient-based',}
-    # s_opts = {"max_iter": 1000, 
-    #         "tol" : 1e-4,
-    #         "acceptable_tol": 1e-2,
-    #         "constr_viol_tol": 1e-3,
-    #         "acceptable_constr_viol_tol": 1e-2,
-    #         "compl_inf_tol": 1e-3,
-    #         "dual_inf_tol": 1e-1,
-    #         "acceptable_dual_inf_tol": 1e2,
-    #         "nlp_scaling_method": 'gradient-based',
-    #         "mu_strategy": 'adaptive',
-    #         "mu_init": 1e-4,
-    #         "mu_target": 1e-6,
-    #         "mu_min": 1e-6,}
+    s_opts = {"max_iter": 100, 
+            "tol" : 1e-6,
+            "acceptable_tol": 1e-4,
+            "constr_viol_tol": 1e-3,
+            "compl_inf_tol": 1e-3,
+            "nlp_scaling_method": 'gradient-based',}
 
     # Generic Optimal Control Sim
 
-    modelFun = CarModel.factory()
+    modelFun = FormulaStudent.factory()
 
     optiProblem, Xs, Us, Gs = OptiProblem.createOptiProblem(modelFun)
 
@@ -377,9 +398,7 @@ if __name__ == "__main__":
         sol = optiProblem.solve()
         print("Solver succeeded.")
         # Assigning Values to Dict
-        SimOut = SimOutputs.createOutputDict(optiProblem, modelFun, Xs, Us, Gs)
-
-        DebugSim(modelFun, SimOut)
+        SimOutputs.createResultsCSV(optiProblem, modelFun, Xs, Us, Gs, sim_output_path, f'TestSim.csv')
 
     except Exception as e:
         print("Solver failed. Debugging variable values...")

@@ -13,8 +13,8 @@ import casadi as ca
 import numpy as np
 # Custom Packages
 
-import src.tools.Mesh as Mesh
-import src.tools.DecisionVariables as DecisionVariables
+import tools.Mesh as Mesh
+import tools.DecisionVariables as DecisionVariables
 
 class BaseModel:
     def __init__(self):

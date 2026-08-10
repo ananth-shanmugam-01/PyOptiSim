@@ -4,10 +4,14 @@ src/PyOptiSim.egg-info/PKG-INFO
 src/PyOptiSim.egg-info/SOURCES.txt
 src/PyOptiSim.egg-info/dependency_links.txt
 src/PyOptiSim.egg-info/top_level.txt
+src/maths/smooth_max.py
+src/maths/smooth_min.py
 src/model/BaseModel.py
-src/model/CarModel.py
-src/model/RocketLanding.py
-src/model/Car/simpleTyre.py
+src/model/Car/CarModel.py
+src/model/Car/component/simpleTyre.py
+src/model/Example/RocketLanding.py
+src/model/Track/TrackModel.py
+src/tools/DebugSim.py
 src/tools/DecisionVariables.py
 src/tools/Mesh.py
 src/tools/OptiProblem.py
