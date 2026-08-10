@@ -45,8 +45,8 @@ class FormulaOne(BaseModel):
         params['chassis']['rWheel'] = 0.33 # m
 
         # Aerodynamic Parameters
-        params['chassis']['SCz'] = 3 # [-]
-        params['chassis']['SCx'] = 0.9 # [-]
+        params['chassis']['SCz'] = 4.8 # [-]
+        params['chassis']['SCx'] = 1.2 # [-]
         params['chassis']['rAeroBalance'] = 0.44 # [-] Aero Downforce Distribution at Front Axle
 
         # Powertrain Parameters
@@ -105,30 +105,98 @@ class FormulaOne(BaseModel):
 
         return self
 
+    def runQSSSim(self) -> dict:
+        """ 
+        Run a very simple QSS sim to get an initial solution for the main car states
+        """
+        mu_max = 1.4 # Radius of grip circle - maximum friction coefficient
+        max_velocity = 80 # m/s - maximum velocity - imposed for simplicity
+        max_power = 350e3 # W - maximum power - imposed for simplicity
+        car_mass = 700 # kg - car mass - imposed for simplicity
+
+        # Calculate Maximum Velocity Profile based Track Curvature and Car Grip
+        track_curvature = self.settings['track']['curv']
+
+        max_velocity_profile = np.minimum(max_velocity, np.sqrt(mu_max * 9.81 / abs(track_curvature + 0.0001)))
+
+        # Calculate Forward Velocity Profile, from the slowest apex
+        idx_max_curvature = np.argmax(-max_velocity_profile)
+
+        forward_acceleration_profile = np.zeros_like(max_velocity_profile)
+        forward_acceleration_profile[idx_max_curvature] = max_velocity_profile[idx_max_curvature] # Start with the same velocity at the first apex
+
+        for index in range(idx_max_curvature, len(max_velocity_profile) - 1):
+            # Calculate the maximum forward acceleration based on the grip circle
+            ax_tyre = np.sqrt((mu_max * 9.81) ** 2 - (forward_acceleration_profile[index] ** 2 * abs(track_curvature[index])))
+            ax_tractive = max_power / forward_acceleration_profile[index] / car_mass # P = F*v => F = P/v => a = F/m
+            ax = min(ax_tyre, ax_tractive)
+
+            forward_acceleration_profile[index+1] = np.sqrt(forward_acceleration_profile[index] ** 2  + 2 * ax * (self.settings['track']['sLap'][index + 1] - self.settings['track']['sLap'][index]))
+            forward_acceleration_profile[index+1] = min(forward_acceleration_profile[index+1], max_velocity_profile[index+1]) # Limit to the maximum velocity profile
+
+        # For continuity, first and last points should have the same forward acceleration profile
+        forward_acceleration_profile[0] = forward_acceleration_profile[-1]
+
+        for index in range(0, idx_max_curvature):
+            # Calculate the maximum forward acceleration based on the grip circle
+            ax_tyre = np.sqrt((mu_max * 9.81) ** 2 - (forward_acceleration_profile[index] ** 2 * abs(track_curvature[index])))
+            ax_tractive = max_power / forward_acceleration_profile[index] / car_mass # P = F*v => F = P/v => a = F/m
+            ax = min(ax_tyre, ax_tractive)
+
+            forward_acceleration_profile[index+1] = np.sqrt(forward_acceleration_profile[index] ** 2  + 2 * ax * (self.settings['track']['sLap'][index + 1] - self.settings['track']['sLap'][index]))
+            forward_acceleration_profile[index+1] = min(forward_acceleration_profile[index+1], max_velocity_profile[index+1]) # Limit to the maximum velocity profile
+
+        # Going in reverse for braking profile
+        backward_acceleration_profile = np.zeros_like(max_velocity_profile)
+        backward_acceleration_profile[-1] = max_velocity_profile[-1] # Start with the same velocity at the last apex
+        for index in range(len(max_velocity_profile) - 1, 0, -1):
+            # Calculate the maximum forward acceleration based on the grip circle
+            ax = np.sqrt((mu_max * 9.81) ** 2 - (forward_acceleration_profile[index] ** 2 * abs(track_curvature[index])))
+
+            backward_acceleration_profile[index-1] = np.sqrt(backward_acceleration_profile[index] ** 2  + 2 * ax * (self.settings['track']['sLap'][index] - self.settings['track']['sLap'][index - 1]))
+            backward_acceleration_profile[index-1] = min(backward_acceleration_profile[index-1], max_velocity_profile[index-1]) # Limit to the maximum velocity profile
+
+        final_velocity_profile = np.minimum(forward_acceleration_profile, backward_acceleration_profile)
+
+        # Calculate Auxiliary outputs
+        initialSolution = dict()
+        initialSolution['sLap'] = self.settings['track']['sLap']
+        initialSolution['u'] = final_velocity_profile
+        initialSolution['time'] = np.zeros_like(initialSolution['u'])
+        for index in range(1, len(initialSolution['u'])):
+            initialSolution['time'][index] = initialSolution['time'][index-1] + (initialSolution['sLap'][index] - initialSolution['sLap'][index-1]) / initialSolution['u'][index]
+        initialSolution['acc_y'] = initialSolution['u'] ** 2 * track_curvature
+        initialSolution['acc_x'] = np.gradient(initialSolution['u'], initialSolution['time'])
+        initialSolution['delta'] = self.settings['chassis']['wheelbase'] * track_curvature
+
+        return initialSolution
+
     def createInitialSolution(self):
 
         # Interpolate to Main Mesh 
         initialSolution = dict()
+
+        QSSSimResults = self.runQSSSim()
 
         # Fixed Value for Longitudinal Velocity Initial Solution
         u_init = 10 # m/s
         t_end_init = self.settings['track']['sLap'][-1] / u_init # s
 
         # Initial Solution for States
-        initialSolution["t"] = np.linspace(0, t_end_init, len(self.mesh_points)) # s
+        initialSolution["t"] = PchipInterpolator(QSSSimResults['sLap'], QSSSimResults['time'])(self.mesh_points) # s
         initialSolution["n"] = np.zeros(len(self.mesh_points))
         initialSolution["xi"] = np.zeros(len(self.mesh_points))
-        initialSolution["u"] = u_init * np.ones(len(self.mesh_points)) # m/s
+        initialSolution["u"] = PchipInterpolator(QSSSimResults['sLap'], QSSSimResults['u'])(self.mesh_points) # m/s
         initialSolution["v"] = np.zeros(len(self.mesh_points)) # m/s
         initialSolution["dpsi"] = np.zeros(len(self.mesh_points)) # rad/s
         initialSolution["x_ir"] = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['xi'])(self.mesh_points) # m - track x-coordinates
         initialSolution["y_ir"] = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['yi'])(self.mesh_points) # m - track y-coordinates
         initialSolution["psi"] = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['theta'])(self.mesh_points) # rad - track heading angle
-        initialSolution["delta"] = np.zeros(len(self.mesh_points)) # rad
+        initialSolution["delta"] = PchipInterpolator(QSSSimResults['sLap'], QSSSimResults['delta'])(self.mesh_points) # rad - steering angle
         initialSolution["Sxf"] = np.zeros(len(self.mesh_points)) # front longitudinal slip
         initialSolution["Sxr"] = np.zeros(len(self.mesh_points)) # rear longitudinal slip
-        initialSolution["acc_x"] = np.zeros(len(self.mesh_points)) # m/s^2
-        initialSolution["acc_y"] = np.zeros(len(self.mesh_points)) # m/s^2
+        initialSolution["acc_x"] = PchipInterpolator(QSSSimResults['sLap'], QSSSimResults['acc_x'])(self.mesh_points) # m/s^2
+        initialSolution["acc_y"] = PchipInterpolator(QSSSimResults['sLap'], QSSSimResults['acc_y'])(self.mesh_points) # m/s^2
         initialSolution["pmguk"] = np.zeros(len(self.mesh_points)) # W
         initialSolution["DeltaSoC"] = np.zeros(len(self.mesh_points)) # J
         initialSolution["rICEThrottle"] = np.zeros(len(self.mesh_points)) # [-]
