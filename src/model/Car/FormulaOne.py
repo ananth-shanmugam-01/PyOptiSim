@@ -52,12 +52,14 @@ class FormulaOne(BaseModel):
         # Powertrain Parameters
         params['powertrain'] = dict()
         params['powertrain']['kDifferential'] = 10.47 # Nms/rad - differential friction coefficient
-        params['powertrain']['PMGUKDeployMax'] = 120e3 # Maximum Deployment MGUK Power in W
+        params['powertrain']['PICEMax'] = 440e3 # Maximum ICE Power in W
+        params['powertrain']['PMGUKDeployMax'] = 350e3 # Maximum Deployment MGUK Power in W
         params['powertrain']['PMGUKHarvestMax'] = -350e3 # Maximum Harvest MGUK Power in W
-        params['powertrain']['DeltaSoCLimit'] = 8e6 # Battery Pack Range - SoC Delta limits from Max to Min in J
+        params['powertrain']['DeltaSoCLimit'] = 4e6 # Battery Pack Range - SoC Delta limits from Max to Min in J
         params['powertrain']['EMGUKHarvestMax'] = 8e6 # Maximum Harvest MGUK Power at the Battery in W
         params['powertrain']['rBatteryEfficiency'] = 0.95 # Round Trip Battery Efficiency
         params['powertrain']['vCarLimit'] = 150 # m/s - default for unconstrained
+        params['powertrain']['isBalancedLap'] = True # If EESS peridiocity is enforced
 
         # Tyre Parameters
         params['tyre'] = dict()
@@ -129,12 +131,14 @@ class FormulaOne(BaseModel):
         initialSolution["acc_y"] = np.zeros(len(self.mesh_points)) # m/s^2
         initialSolution["pmguk"] = np.zeros(len(self.mesh_points)) # W
         initialSolution["DeltaSoC"] = np.zeros(len(self.mesh_points)) # J
+        initialSolution["rICEThrottle"] = np.zeros(len(self.mesh_points)) # [-]
 
         # Initial Solution for Controls
         initialSolution["der_delta"] = np.zeros(len(self.mesh_points))
         initialSolution["der_Sxf"] = np.zeros(len(self.mesh_points))
         initialSolution["der_Sxr"] = np.zeros(len(self.mesh_points))
         initialSolution["der_pmguk"] = np.zeros(len(self.mesh_points))
+        initialSolution["der_rICEThrottle"] = np.zeros(len(self.mesh_points))
 
         self.initialSolution = initialSolution
 
@@ -198,10 +202,16 @@ class FormulaOne(BaseModel):
         self.states = DecisionVariables.addState(self.states, pmguk_harvest, 'pmguk_harvest', 'der_pmguk_harvest', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], 0), 3, (0, 0), self.initialSolution["pmguk"]) 
 
         DeltaSoC = ca.SX.sym('DeltaSoC') # Battery State of Charge Delta from Start of Lap (J) - Free Boundary Conditions, as long as it is within the prescribed window
-        self.states = DecisionVariables.addState(self.states, DeltaSoC, 'DeltaSoC', 'pmguk_battery', 1e6, (0, self.settings['powertrain']['DeltaSoCLimit']), 0, (0, 0),  self.initialSolution["DeltaSoC"]) 
+        if self.settings['powertrain']['isBalancedLap']:
+            self.states = DecisionVariables.addState(self.states, DeltaSoC, 'DeltaSoC', 'pmguk_battery', 1e6, (0, self.settings['powertrain']['DeltaSoCLimit']), 3, (0, 0),  self.initialSolution["DeltaSoC"]) 
+        else:
+            self.states = DecisionVariables.addState(self.states, DeltaSoC, 'DeltaSoC', 'pmguk_battery', 1e6, (0, self.settings['powertrain']['DeltaSoCLimit']), 0, (0, 0),  self.initialSolution["DeltaSoC"])
 
-        # EMGUKHarvest = ca.SX.sym('EMGUKHarvest') # MGUK Harvest Energy at the Battery (J) - Starts at Zero
-        # self.states = DecisionVariables.addState(self.states, EMGUKHarvest, 'EMGUKHarvest', 'pmguk_harvest', 1e6, (-1e6, self.settings['powertrain']['EMGUKHarvestMax']), 1, (0, 0),  self.initialSolution["DeltaSoC"]) 
+        EMGUKHarvest = ca.SX.sym('EMGUKHarvest') # MGUK Harvest Energy at the Battery (J) - Starts at Zero
+        self.states = DecisionVariables.addState(self.states, EMGUKHarvest, 'EMGUKHarvest', 'pmguk_harvest', 1e6, (-1e6, self.settings['powertrain']['EMGUKHarvestMax']), 1, (0, 0),  self.initialSolution["DeltaSoC"]) 
+
+        rICEThrottle = ca.SX.sym('rICEThrottle') # ICE Throttle Ratio (-)
+        self.states = DecisionVariables.addState(self.states, rICEThrottle, 'rICEThrottle', 'der_rICEThrottle', 1, (0, 1), 3, (0, 0),  self.initialSolution["rICEThrottle"])
 
         # Controls
         der_delta = ca.SX.sym('der_delta')
@@ -224,6 +234,9 @@ class FormulaOne(BaseModel):
 
         der_pmguk_harvest = ca.SX.sym('der_pmguk_harvest')
         self.controls = DecisionVariables.addControl(self.controls, der_pmguk_harvest, 'der_pmguk_harvest', 1e6, (-1e6, 1e6), self.initialSolution["der_pmguk"])
+
+        der_rICEThrottle = ca.SX.sym('der_rICEThrottle')
+        self.controls = DecisionVariables.addControl(self.controls, der_rICEThrottle, 'der_rICEThrottle', 1, (-10, 10), self.initialSolution["der_rICEThrottle"])
 
         # Parameters
         curv = ca.SX.sym('curv')
@@ -310,7 +323,7 @@ class FormulaOne(BaseModel):
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
 
         # Power at Wheel Constraint
-        power_constraint = (pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency'] + pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency']) - power_wheel # Path Constraint
+        power_constraint = (rICEThrottle * self.settings['powertrain']['PICEMax'] +  pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency'] + pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency']) - power_wheel # Path Constraint
         
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, pmguk_deploy + pmguk_harvest, 'power_battery')
 
@@ -344,7 +357,8 @@ class FormulaOne(BaseModel):
         rhs[16] = Sf * der_pmguk_deploy
         rhs[17] = Sf * der_pmguk_harvest
         rhs[18] = Sf * -1 * (pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency'] + pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency']) # Deploy results in battery depletion, harvest results in battery charge
-        # rhs[19] = Sf * -1 * pmguk_harvest # Harvest results in battery charge
+        rhs[19] = Sf * -1 * pmguk_harvest # Harvest results in battery charge
+        rhs[20] = Sf * der_rICEThrottle
 
         # Stage Cost
         cost = ( Sf
@@ -353,9 +367,9 @@ class FormulaOne(BaseModel):
                 + ( 0.0005 * der_Sxfr**2 )
                 + ( 0.0005 * der_Sxrl**2 )
                 + ( 0.0005 * der_Sxrr**2 )
+                + ( 0.0005 * der_rICEThrottle**2 )
                 + ( 1e-14 * der_pmguk_deploy)**2
                 + ( 1e-14 * der_pmguk_harvest)**2
-                # + ( 1e-18 * (pmguk_deploy * pmguk_harvest)**2 )
             )
 
         # Model Function

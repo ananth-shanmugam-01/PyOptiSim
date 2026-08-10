@@ -41,13 +41,13 @@ if __name__ == "__main__":
     plt.ylabel('Power (W)')
     plt.legend()
 
-    # i += 1
-    # plt.subplot(n_rows, 1, i)
-    # plt.plot(results['sLap'], results['EMGUKHarvest'], label='EMGUKHarvest')
-    # plt.title('EMGUK Harvesting over Lap')
-    # plt.xlabel('Lap Distance (m)')
-    # plt.ylabel('EMGUK Harvest [J]')
-    # plt.legend()
+    i += 1
+    plt.subplot(n_rows, 1, i)
+    plt.plot(results['sLap'], results['EMGUKHarvest'], label='EMGUKHarvest')
+    plt.title('EMGUK Harvesting over Lap')
+    plt.xlabel('Lap Distance (m)')
+    plt.ylabel('EMGUK Harvest [J]')
+    plt.legend()
 
     i += 1
     plt.subplot(n_rows, 1, i)
