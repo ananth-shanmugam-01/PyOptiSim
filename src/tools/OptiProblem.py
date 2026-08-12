@@ -1,146 +1,187 @@
 import casadi as ca
 import numpy as np
 
+
+def _scaled_expression(variable, scale):
+    """Convert normalized decision variables to physical quantities."""
+    return ca.repmat(ca.DM(scale).reshape((-1, 1)), 1, variable.size2()) * variable
+
+
+def _add_bounds(opti, variable, lower, upper, scale):
+    """Apply physical bounds to normalized variables, column-wise."""
+    scale = np.asarray(scale, dtype=float).reshape((-1, 1))
+    lower = np.asarray(lower, dtype=float).reshape((-1, 1)) / scale
+    upper = np.asarray(upper, dtype=float).reshape((-1, 1)) / scale
+    ncols = variable.size2()
+    opti.subject_to(opti.bounded(
+        ca.repmat(ca.DM(lower), 1, ncols),
+        variable,
+        ca.repmat(ca.DM(upper), 1, ncols),
+    ))
+
+
+def _add_physical_bounds(opti, expression, lower, upper, scale):
+    """Apply bounds to an expression whose values are already physical."""
+    scale = np.asarray(scale, dtype=float).reshape((-1, 1))
+    lower = np.asarray(lower, dtype=float).reshape((-1, 1))
+    upper = np.asarray(upper, dtype=float).reshape((-1, 1))
+    ncols = expression.size2()
+    scale = ca.repmat(ca.DM(scale), 1, ncols)
+    lower = ca.repmat(ca.DM(lower), 1, ncols)
+    upper = ca.repmat(ca.DM(upper), 1, ncols)
+    opti.subject_to(opti.bounded(lower / scale, expression / scale, upper / scale))
+
+
+def _set_initial(opti, variable, values, scale):
+    """Set an initial value on a normalized variable matrix."""
+    values = np.asarray(values, dtype=float)
+    if values.ndim == 1:
+        if variable.size1() == 1:
+            values = values.reshape((1, -1))
+        else:
+            values = values.reshape((-1, 1))
+    scale = np.asarray(scale, dtype=float)
+    if scale.size == 1:
+        values = values / scale.item()
+    else:
+        values = values / scale.reshape((-1, 1))
+    opti.set_initial(variable, values)
+
+
 def createOptiProblem(model):
+    """Create a direct collocation NLP with globally allocated trajectories.
 
+    States and controls retain the original transcription: both have values at
+    every mesh endpoint and collocation point, and controls retain the
+    collocation interpolation/continuity constraints.  The difference is that
+    all variables are allocated once, outside the interval loop.  Interval
+    slices are then used to assemble the collocation equations and outputs.
+    """
     opti = ca.Opti()
-    
+
+    nx = model.states.num_x
+    nu = model.controls.num_u
+    ng = model.parameters.num_g
+    n_intervals = model.mesh_numIntervals
+    degree = model.collocation_degree
+    n_grid = n_intervals * (degree + 1) + 1
+
+    # Normalized decision variables are allocated globally.  Physical
+    # expressions are derived once and passed to the model function.
+    X_nodes_bar = opti.variable(nx, n_intervals + 1)
+    X_colloc_bar = opti.variable(nx, n_intervals * degree)
+    U_nodes_bar = opti.variable(nu, n_intervals + 1)
+    U_colloc_bar = opti.variable(nu, n_intervals * degree)
+
+    X_nodes = _scaled_expression(X_nodes_bar, model.states.scale)
+    X_colloc = _scaled_expression(X_colloc_bar, model.states.scale)
+    U_nodes = _scaled_expression(U_nodes_bar, model.controls.scale)
+    U_colloc = _scaled_expression(U_colloc_bar, model.controls.scale)
+
+    _add_bounds(opti, X_nodes_bar, model.states.lb, model.states.ub, model.states.scale)
+    _add_bounds(opti, X_colloc_bar, model.states.lb, model.states.ub, model.states.scale)
+    _add_bounds(opti, U_nodes_bar, model.controls.lb, model.controls.ub, model.controls.scale)
+    _add_bounds(opti, U_colloc_bar, model.controls.lb, model.controls.ub, model.controls.scale)
+
+    # Parameters are also allocated once. They are not NLP decision variables.
+    Gs = opti.parameter(ng, n_grid)
+    if ng > 0:
+        parameter_values = np.vstack([
+            np.asarray(value, dtype=float).reshape(1, -1)
+            for value in model.parameters.value
+        ])
+        if parameter_values.shape[1] != n_grid:
+            raise ValueError(
+                "Parameter initial values must have one value per mesh/collocation point "
+                f"({n_grid}); received {parameter_values.shape[1]}."
+            )
+        opti.set_value(Gs, parameter_values)
+
+    # Reconstruct the original public trajectory ordering:
+    # endpoint, collocation points, endpoint, collocation points, ..., endpoint.
+    X_columns = [X_nodes[:, 0]]
+    U_columns = [U_nodes[:, 0]]
+    G_columns = [Gs[:, 0]]
+    for interval in range(n_intervals):
+        colloc_start = interval * degree
+        colloc_end = (interval + 1) * degree
+        X_columns.extend([X_colloc[:, colloc_start:colloc_end][:, j] for j in range(degree)])
+        U_columns.extend([U_colloc[:, colloc_start:colloc_end][:, j] for j in range(degree)])
+        G_columns.extend([Gs[:, 1 + interval * (degree + 1) + j] for j in range(degree)])
+        X_columns.append(X_nodes[:, interval + 1])
+        U_columns.append(U_nodes[:, interval + 1])
+        G_columns.append(Gs[:, 1 + interval * (degree + 1) + degree])
+
+    Xs = ca.horzcat(*X_columns)
+    Us = ca.horzcat(*U_columns)
+    Gs_ordered = ca.horzcat(*G_columns)
+
+    # Set initial guesses in the globally allocated variables.  The public
+    # ordering above is used to map the supplied initial mesh trajectory.
+    # Initial profiles are supplied by model implementations and may be
+    # either (n_grid,) or (n_grid, 1), depending on the interpolation source.
+    # Normalize each profile independently rather than converting the whole
+    # list to one NumPy array.
+    state_initial = [np.asarray(profile, dtype=float).reshape(-1) for profile in model.states.x_init]
+    for i in range(nx):
+        _set_initial(opti, X_nodes_bar[i, :], state_initial[i][[0] + [1 + k * (degree + 1) + degree for k in range(n_intervals)]], model.states.scale[i])
+        colloc_indices = [1 + k * (degree + 1) + j for k in range(n_intervals) for j in range(degree)]
+        _set_initial(opti, X_colloc_bar[i, :], state_initial[i][colloc_indices], model.states.scale[i])
+
+        if model.states.BC[i] == 4:
+            opti.subject_to(X_nodes_bar[i, 0] == model.states.BCini[i] / model.states.scale[i])
+            opti.subject_to(X_nodes_bar[i, -1] == model.states.BCend[i] / model.states.scale[i])
+        elif model.states.BC[i] == 3:
+            opti.subject_to(X_nodes_bar[i, 0] == X_nodes_bar[i, -1])
+        elif model.states.BC[i] == 2:
+            opti.subject_to(X_nodes_bar[i, -1] == model.states.BCend[i] / model.states.scale[i])
+        elif model.states.BC[i] == 1:
+            opti.subject_to(X_nodes_bar[i, 0] == model.states.BCini[i] / model.states.scale[i])
+        elif model.states.BC[i] != 0:
+            raise ValueError("Boundary Conditions are Incorrectly Defined")
+
+    control_initial = [np.asarray(profile, dtype=float).reshape(-1) for profile in model.controls.u_init]
+    for i in range(nu):
+        _set_initial(opti, U_nodes_bar[i, :], control_initial[i][[0] + [1 + k * (degree + 1) + degree for k in range(n_intervals)]], model.controls.scale[i])
+        colloc_indices = [1 + k * (degree + 1) + j for k in range(n_intervals) for j in range(degree)]
+        _set_initial(opti, U_colloc_bar[i, :], control_initial[i][colloc_indices], model.controls.scale[i])
+
     cost = 0
-    
-    Xs = []
-    Us = []
-    Gs = []
-    
-    # Multiply decision variables with their corresponding scales
-    Xk = opti.variable( model.states.num_x ) * model.states.scale
-    Uk = opti.variable( model.controls.num_u ) * model.controls.scale
-    Gk = opti.parameter( model.parameters.num_g )
+    for interval in range(n_intervals):
+        colloc_start = interval * degree
+        colloc_end = (interval + 1) * degree
+        Xk = X_nodes[:, interval]
+        Xc = X_colloc[:, colloc_start:colloc_end]
+        Uk = U_nodes[:, interval]
+        Uc = U_colloc[:, colloc_start:colloc_end]
+        Gc = Gs[:, 1 + interval * (degree + 1):1 + interval * (degree + 1) + degree]
 
-    # Apply bounds to states and controls
-    # States
-    for i in range(model.states.num_x):
-        opti.subject_to ( opti.bounded(model.states.lb[i] / model.states.scale[i], Xk[i, :] / model.states.scale[i], model.states.ub[i] / model.states.scale[i]) )
-
-    # Controls
-    for i in range( model.controls.num_u ):
-        opti.subject_to ( opti.bounded(model.controls.lb[i] / model.controls.scale[i], Uk[i, :] / model.controls.scale[i], model.controls.ub[i] / model.controls.scale[i]) )
-
-    Xs = ca.horzcat(Xs, Xk ) 
-    Us = ca.horzcat(Us, Uk ) 
-    Gs = ca.horzcat(Gs, Gk ) 
-    
-    for i in range( model.mesh_numIntervals ):
-        
-        Xc = opti.variable( model.states.num_x, model.collocation_degree ) * model.states.scale
-        Uc = opti.variable( model.controls.num_u, model.collocation_degree ) * model.controls.scale
-        Gc = opti.parameter( model.parameters.num_g, model.collocation_degree )
-        
-        # Apply bounds to states and controls
-        # States
-        for j in range(model.states.num_x):
-            opti.subject_to( opti.bounded( model.states.lb[j] / model.states.scale[j], Xc[j, :] / model.states.scale[j], model.states.ub[j] / model.states.scale[j]) )
-
-        # Controls
-        for j in range( model.controls.num_u ):
-            opti.subject_to( opti.bounded( model.controls.lb[j] / model.controls.scale[j], Uc[j, :] / model.controls.scale[j], model.controls.ub[j] / model.controls.scale[j]) )
-
-        Xs = ca.horzcat(Xs, Xc ) 
-        Us = ca.horzcat(Us, Uc ) 
-        Gs = ca.horzcat(Gs, Gc ) 
-        
         rhs, L, path_constraints, _ = model.modelFunction(Xc, Uc, Gc)
 
-        # If path constraints is not an empty list
-        if path_constraints.size(1) > 0:
-            for j in range( model.path_constraints.num_path ):
-                # Path Constraint Bounds
-                opti.subject_to ( opti.bounded( model.path_constraints.lb[j] / model.path_constraints.scale[j], path_constraints[j,:] / model.path_constraints.scale[j], model.path_constraints.ub[j] / model.path_constraints.scale[j]) )
-        
-        cost = cost + np.matmul( L , model.collocation_B * model.mesh_size )
-        
-        Z_s = ca.horzcat( Xk , Xc )
-        Z_u = ca.horzcat( Uk , Uc )
-        
-        # Get slope of the interpolating polynomial    
-        Pidot = ( 1 / model.mesh_size ) * np.matmul( Z_s , model.collocation_C )
-    
-        # Scaling the Equality Constraints
-        for ii in range(Pidot.shape[0]):
-            opti.subject_to( Pidot[ii,:] / model.states.scale[ii] == rhs[ii,:] / model.states.scale[ii] )
-        
-        Xk_end = np.matmul( Z_s, model.collocation_D )
-        Uk_end = np.matmul( Z_u, model.collocation_D )
-        
-        Xk = opti.variable( model.states.num_x ) * model.states.scale
-        Uk = opti.variable( model.controls.num_u ) * model.controls.scale
-        Gk = opti.parameter( model.parameters.num_g )
+        if path_constraints.size1() > 0:
+            _add_physical_bounds(
+                opti,
+                path_constraints,
+                model.path_constraints.lb,
+                model.path_constraints.ub,
+                model.path_constraints.scale,
+            )
 
-        # Continuity Constraints
-        for ii in range(model.states.num_x):
-            opti.subject_to( Xk_end[ii] / model.states.scale[ii] == Xk[ii] / model.states.scale[ii] )
+        cost += ca.mtimes(L, ca.DM(model.collocation_B * model.mesh_size))
 
-        for ii in range(model.controls.num_u):
-            opti.subject_to( Uk_end[ii] / model.controls.scale[ii] == Uk[ii] / model.controls.scale[ii] )
+        Z_s = ca.horzcat(Xk, Xc)
+        Z_u = ca.horzcat(Uk, Uc)
+        Pidot = (1 / model.mesh_size) * ca.mtimes(Z_s, ca.DM(model.collocation_C))
+        state_scale_inv = ca.diag(1 / ca.DM(model.states.scale))
+        opti.subject_to(
+            ca.mtimes(state_scale_inv, Pidot)
+            == ca.mtimes(state_scale_inv, rhs)
+        )
 
-        # Apply bounds to states and controls
-        # States
-        for j in range(model.states.num_x):
-            opti.subject_to( opti.bounded( model.states.lb[j] / model.states.scale[j], Xk[j,:] / model.states.scale[j], model.states.ub[j] / model.states.scale[j]) )
+        Xk_end = ca.mtimes(Z_s, ca.DM(model.collocation_D))
+        Uk_end = ca.mtimes(Z_u, ca.DM(model.collocation_D))
+        opti.subject_to(Xk_end / ca.DM(model.states.scale) == X_nodes_bar[:, interval + 1])
+        opti.subject_to(Uk_end / ca.DM(model.controls.scale) == U_nodes_bar[:, interval + 1])
 
-        # Controls
-        for j in range( model.controls.num_u ):
-            opti.subject_to( opti.bounded( model.controls.lb[j] / model.controls.scale[j], Uk[j,:] / model.controls.scale[j], model.controls.ub[j] / model.controls.scale[j]) )
-
-        Xs = ca.horzcat(Xs, Xk ) 
-        Us = ca.horzcat(Us, Uk ) 
-        Gs = ca.horzcat(Gs, Gk ) 
-    
-    # Decision Variable Settings
-    
-    # States
-    for i in range(model.states.num_x):
-
-        # Initial Solution
-        opti.set_initial( Xs[i,:], model.states.x_init[i] )
-        
-        # Boundary Conditions
-        # BC - 0 - No BC, 1 - Initial Fixed, 2 - Final Fixed, 3 - continuity, 4 - Initial and Terminal Fixed
-        if model.states.BC[i] == 4:
-            # Initial and Terminal Fixed
-            opti.subject_to( Xs[i, 0] / model.states.scale[i] == model.states.BCini[i] / model.states.scale[i])
-            opti.subject_to( Xs[i, -1] / model.states.scale[i] == model.states.BCend[i] / model.states.scale[i] )
-                            
-        elif model.states.BC[i] == 3:
-            # Continuity
-            opti.subject_to( Xs[i, 0] / model.states.scale[i] == Xs[i, -1] / model.states.scale[i])
-        
-        elif model.states.BC[i] == 2:
-            # Final Value Fixed
-            opti.subject_to( Xs[i, -1] / model.states.scale[i] == model.states.BCend[i] / model.states.scale[i] )
-        
-        elif model.states.BC[i] == 1:
-            # Initial Value Fixed
-            opti.subject_to( Xs[i, 0] / model.states.scale[i] == model.states.BCini[i] / model.states.scale[i])
-        
-        elif model.states.BC[i] == 0:
-            # No Boundary Conditions
-            continue
-        
-        else:
-            # No Boundary Condition
-            raise ValueError("Boundary Conditions are Incorrectly Defined")     
-       
-    
-    # Controls
-    for i in range( model.controls.num_u ):
-        # Initial Solution
-        opti.set_initial( Us[i,:], model.controls.u_init[i] )
-    
-    # Parameters
-    for i in range( model.parameters.num_g ):
-        opti.set_value( Gs[i,:], model.parameters.value[i] )
-    
-    # Objective
-    opti.minimize( cost )
-    
-    return opti, Xs, Us, Gs
+    opti.minimize(cost)
+    return opti, Xs, Us, Gs_ordered
