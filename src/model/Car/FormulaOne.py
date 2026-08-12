@@ -213,114 +213,57 @@ class FormulaOne(BaseModel):
     def createModelFunction(self):
 
         # States
-        # addState(states, sym, name, der_name, scale, bounds, BC, BC_Vals, initialSolution):
+        # addState(states, name, der_name, scale, bounds, BC, BC_Vals, initialSolution):
         # BC - 0 - No BC, 1 - Initial Fixed, 2 - Final Fixed, 3 - continuity, 4 - Initial and Terminal Fixed
-        t = ca.SX.sym('t')     # time (s)
-        self.states = DecisionVariables.addState(self.states, t, 't', 'der_t', 100, (0, 1e3), 1, (0, 0), self.initialSolution["t"] )
-
-        n = ca.SX.sym('n')
-        self.states = DecisionVariables.addState(self.states, n, 'n', 'der_n', 1, (-0.1, 0.1), 3, (0, 0), self.initialSolution["n"] )
-
-        xi = ca.SX.sym('xi') # Heading angle deviation (rad)
-        self.states = DecisionVariables.addState(self.states, xi, 'xi', 'der_xi', 1, (np.radians(-4), np.radians(4)), 3, (0, 0), self.initialSolution["xi"] )
-
-        u = ca.SX.sym('u')         # vehicle fixed x-velocity (m/s)
-        self.states = DecisionVariables.addState(self.states, u, 'u', 'accx', 10, (1, self.settings['powertrain']['vCarLimit']), 3, (0, 0), self.initialSolution["u"] )
-
-        v = ca.SX.sym('v')         # vehicle fixed y-velocity (m/s)
-        self.states = DecisionVariables.addState(self.states, v, 'v', 'accy', 10, (-1e2, 1e2), 3, (0, 0),  self.initialSolution["v"])
-
-        dpsi = ca.SX.sym('dpsi')   # vehicle yaw rate (rad/s)
-        self.states = DecisionVariables.addState(self.states, dpsi, 'dpsi', 'der_dpsi', 10, (-1e3, 1e3), 3, (0, 0), self.initialSolution["dpsi"]) 
-
-        x_ir = ca.SX.sym('x_ir')   # x-Position in global coordinates (m)
-        self.states = DecisionVariables.addState(self.states, x_ir, 'x_ir', 'der_x_ir', 1000, (-2000, 2000), 1, (self.settings['track']['xi'][0],  self.settings['track']['xi'][-1]), self.initialSolution["x_ir"]) 
-
-        y_ir = ca.SX.sym('y_ir')   # y-Position in global coordinates (m)
-        self.states = DecisionVariables.addState(self.states, y_ir, 'y_ir', 'der_y_ir', 1000, (-2000, 2000), 1, (self.settings['track']['yi'][0],  self.settings['track']['yi'][-1]), self.initialSolution["y_ir"])     
-
-        psi = ca.SX.sym('psi')     # yaw angle (rad)
-        self.states = DecisionVariables.addState(self.states, psi, 'psi', 'der_psi', 10, (-10, 10), 1, (self.settings['track']['theta'][0], self.settings['track']['theta'][-1]),  self.initialSolution["psi"])     
-
-        delta = ca.SX.sym('delta')  # steering angle (rad)
-        self.states = DecisionVariables.addState(self.states, delta, 'delta', 'der_delta', 1, (np.radians(-20), np.radians(20)), 3, (0, 0),  self.initialSolution["delta"])     
-
-        Sxfl = ca.SX.sym('Sxfl')      # front left long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxfl, 'Sxfl', 'der_Sxfl', 1, (-0.15, 0), 3, (0, 0),  self.initialSolution["Sxf"]) 
-        
-        Sxfr = ca.SX.sym('Sxfr')      # front right long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxfr, 'Sxfr', 'der_Sxfr', 1, (-0.15, 0), 3, (0, 0),  self.initialSolution["Sxf"]) 
-
-        Sxrl = ca.SX.sym('Sxrl')      # rear left long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxrl, 'Sxrl', 'der_Sxrl', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxr"]) 
-
-        Sxrr = ca.SX.sym('Sxrr')      # rear right long. slip (-)
-        self.states = DecisionVariables.addState(self.states, Sxrr, 'Sxrr', 'der_Sxrr', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxr"]) 
-
-        acc_x = ca.SX.sym('acc_x') # longitudinal acceleration (m/s^2)
-        self.states = DecisionVariables.addState(self.states, acc_x, 'acc_x', 'der_acc_x', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_x"]) 
-
-        acc_y = ca.SX.sym('acc_y') # lateral acceleration (m/s^2)
-        self.states = DecisionVariables.addState(self.states, acc_y, 'acc_y', 'der_acc_y', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_y"]) 
-
-        pmguk_deploy = ca.SX.sym('pmguk_deploy') # MGUK Deploy Power at the Wheel (W)
-        self.states = DecisionVariables.addState(self.states, pmguk_deploy, 'pmguk_deploy', 'der_pmguk_deploy', 1e6, (0, self.settings['powertrain']['PMGUKDeployMax']), 3, (0, 0), self.initialSolution["pmguk"]) 
-
-        pmguk_harvest = ca.SX.sym('pmguk_harvest') # MGUK Harvest Power at the Wheel (W)
-        self.states = DecisionVariables.addState(self.states, pmguk_harvest, 'pmguk_harvest', 'der_pmguk_harvest', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], 0), 3, (0, 0), self.initialSolution["pmguk"]) 
-
-        DeltaSoC = ca.SX.sym('DeltaSoC') # Battery State of Charge Delta from Start of Lap (J) - Free Boundary Conditions, as long as it is within the prescribed window
+        self.states = DecisionVariables.addState(self.states, 't', 'der_t', 100, (0, 1e3), 1, (0, 0), self.initialSolution["t"] )
+        self.states = DecisionVariables.addState(self.states, 'n', 'der_n', 1, (-0.1, 0.1), 3, (0, 0), self.initialSolution["n"] )
+        self.states = DecisionVariables.addState(self.states, 'xi', 'der_xi', 1, (np.radians(-4), np.radians(4)), 3, (0, 0), self.initialSolution["xi"] )
+        self.states = DecisionVariables.addState(self.states, 'u', 'accx', 10, (1, self.settings['powertrain']['vCarLimit']), 3, (0, 0), self.initialSolution["u"] )
+        self.states = DecisionVariables.addState(self.states, 'v', 'accy', 10, (-1e2, 1e2), 3, (0, 0),  self.initialSolution["v"])
+        self.states = DecisionVariables.addState(self.states, 'dpsi', 'der_dpsi', 10, (-1e3, 1e3), 3, (0, 0), self.initialSolution["dpsi"])
+        self.states = DecisionVariables.addState(self.states, 'x_ir', 'der_x_ir', 1000, (-2000, 2000), 1, (self.settings['track']['xi'][0],  self.settings['track']['xi'][-1]), self.initialSolution["x_ir"])
+        self.states = DecisionVariables.addState(self.states, 'y_ir', 'der_y_ir', 1000, (-2000, 2000), 1, (self.settings['track']['yi'][0],  self.settings['track']['yi'][-1]), self.initialSolution["y_ir"])
+        self.states = DecisionVariables.addState(self.states, 'psi', 'der_psi', 10, (-10, 10), 1, (self.settings['track']['theta'][0], self.settings['track']['theta'][-1]),  self.initialSolution["psi"])
+        self.states = DecisionVariables.addState(self.states, 'delta', 'der_delta', 1, (np.radians(-20), np.radians(20)), 3, (0, 0),  self.initialSolution["delta"])
+        self.states = DecisionVariables.addState(self.states, 'Sxfl', 'der_Sxfl', 1, (-0.15, 0), 3, (0, 0),  self.initialSolution["Sxf"])
+        self.states = DecisionVariables.addState(self.states, 'Sxfr', 'der_Sxfr', 1, (-0.15, 0), 3, (0, 0),  self.initialSolution["Sxf"])
+        self.states = DecisionVariables.addState(self.states, 'Sxrl', 'der_Sxrl', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxr"])
+        self.states = DecisionVariables.addState(self.states, 'Sxrr', 'der_Sxrr', 1, (-0.15, 0.15), 3, (0, 0),  self.initialSolution["Sxr"])
+        self.states = DecisionVariables.addState(self.states, 'acc_x', 'der_acc_x', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_x"])
+        self.states = DecisionVariables.addState(self.states, 'acc_y', 'der_acc_y', 1e2, (-100, 100), 3, (0, 0),  self.initialSolution["acc_y"])
+        self.states = DecisionVariables.addState(self.states, 'pmguk_deploy', 'der_pmguk_deploy', 1e6, (0, self.settings['powertrain']['PMGUKDeployMax']), 3, (0, 0), self.initialSolution["pmguk"])
+        self.states = DecisionVariables.addState(self.states, 'pmguk_harvest', 'der_pmguk_harvest', 1e6, (self.settings['powertrain']['PMGUKHarvestMax'], 0), 3, (0, 0), self.initialSolution["pmguk"])
         if self.settings['powertrain']['isBalancedLap']:
-            self.states = DecisionVariables.addState(self.states, DeltaSoC, 'DeltaSoC', 'pmguk_battery', 1e6, (0, self.settings['powertrain']['DeltaSoCLimit']), 3, (0, 0),  self.initialSolution["DeltaSoC"]) 
+            self.states = DecisionVariables.addState(self.states, 'DeltaSoC', 'pmguk_battery', 1e6, (0, self.settings['powertrain']['DeltaSoCLimit']), 3, (0, 0),  self.initialSolution["DeltaSoC"])
         else:
-            self.states = DecisionVariables.addState(self.states, DeltaSoC, 'DeltaSoC', 'pmguk_battery', 1e6, (0, self.settings['powertrain']['DeltaSoCLimit']), 0, (0, 0),  self.initialSolution["DeltaSoC"])
-
-        EMGUKHarvest = ca.SX.sym('EMGUKHarvest') # MGUK Harvest Energy at the Battery (J) - Starts at Zero
-        self.states = DecisionVariables.addState(self.states, EMGUKHarvest, 'EMGUKHarvest', 'pmguk_harvest', 1e6, (-1e6, self.settings['powertrain']['EMGUKHarvestMax']), 1, (0, 0),  self.initialSolution["DeltaSoC"]) 
-
-        rICEThrottle = ca.SX.sym('rICEThrottle') # ICE Throttle Ratio (-)
-        self.states = DecisionVariables.addState(self.states, rICEThrottle, 'rICEThrottle', 'der_rICEThrottle', 1, (0, 1), 3, (0, 0),  self.initialSolution["rICEThrottle"])
+            self.states = DecisionVariables.addState(self.states, 'DeltaSoC', 'pmguk_battery', 1e6, (0, self.settings['powertrain']['DeltaSoCLimit']), 0, (0, 0),  self.initialSolution["DeltaSoC"])
+        self.states = DecisionVariables.addState(self.states, 'EMGUKHarvest', 'pmguk_harvest', 1e6, (-1e6, self.settings['powertrain']['EMGUKHarvestMax']), 1, (0, 0),  self.initialSolution["DeltaSoC"])
+        self.states = DecisionVariables.addState(self.states, 'rICEThrottle', 'der_rICEThrottle', 1, (0, 1), 3, (0, 0),  self.initialSolution["rICEThrottle"])
 
         # Controls
-        der_delta = ca.SX.sym('der_delta')
-        self.controls = DecisionVariables.addControl(self.controls, der_delta, 'der_delta', 1, (-10, 10), self.initialSolution["der_delta"])
-
-        der_Sxfl = ca.SX.sym('der_Sxfl')
-        self.controls = DecisionVariables.addControl(self.controls, der_Sxfl, 'der_Sxfl', 1, (-10, 10), self.initialSolution["der_Sxf"])
-
-        der_Sxfr = ca.SX.sym('der_Sxfr')
-        self.controls = DecisionVariables.addControl(self.controls, der_Sxfr, 'der_Sxfr', 1, (-10, 10), self.initialSolution["der_Sxf"])
-
-        der_Sxrl = ca.SX.sym('der_Sxrl')
-        self.controls = DecisionVariables.addControl(self.controls, der_Sxrl, 'der_Sxrl', 1, (-10, 10), self.initialSolution["der_Sxr"])
-
-        der_Sxrr = ca.SX.sym('der_Sxrr')
-        self.controls = DecisionVariables.addControl(self.controls, der_Sxrr, 'der_Sxrr', 1, (-10, 10), self.initialSolution["der_Sxr"])
-
-        der_pmguk_deploy = ca.SX.sym('der_pmguk_deploy')
-        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_deploy, 'der_pmguk_deploy', 1e6, (-1e6, 1e6), self.initialSolution["der_pmguk"])
-
-        der_pmguk_harvest = ca.SX.sym('der_pmguk_harvest')
-        self.controls = DecisionVariables.addControl(self.controls, der_pmguk_harvest, 'der_pmguk_harvest', 1e6, (-1e6, 1e6), self.initialSolution["der_pmguk"])
-
-        der_rICEThrottle = ca.SX.sym('der_rICEThrottle')
-        self.controls = DecisionVariables.addControl(self.controls, der_rICEThrottle, 'der_rICEThrottle', 1, (-10, 10), self.initialSolution["der_rICEThrottle"])
+        self.controls = DecisionVariables.addControl(self.controls, 'der_delta', 1, (-10, 10), self.initialSolution["der_delta"])
+        self.controls = DecisionVariables.addControl(self.controls, 'der_Sxfl', 1, (-10, 10), self.initialSolution["der_Sxf"])
+        self.controls = DecisionVariables.addControl(self.controls, 'der_Sxfr', 1, (-10, 10), self.initialSolution["der_Sxf"])
+        self.controls = DecisionVariables.addControl(self.controls, 'der_Sxrl', 1, (-10, 10), self.initialSolution["der_Sxr"])
+        self.controls = DecisionVariables.addControl(self.controls, 'der_Sxrr', 1, (-10, 10), self.initialSolution["der_Sxr"])
+        self.controls = DecisionVariables.addControl(self.controls, 'der_pmguk_deploy', 1e6, (-1e6, 1e6), self.initialSolution["der_pmguk"])
+        self.controls = DecisionVariables.addControl(self.controls, 'der_pmguk_harvest', 1e6, (-1e6, 1e6), self.initialSolution["der_pmguk"])
+        self.controls = DecisionVariables.addControl(self.controls, 'der_rICEThrottle', 1, (-10, 10), self.initialSolution["der_rICEThrottle"])
 
         # Parameters
-        curv = ca.SX.sym('curv')
         curv_interp = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['curv']) (self.mesh_points)
-        self.parameters = DecisionVariables.addParameter(self.parameters, curv, 'curv', curv_interp)
+        self.parameters = DecisionVariables.addParameter(self.parameters, 'curv', curv_interp)
 
         # Vehicle Model
-        Fd = -0.5 * self.settings['constants']['airDensity'] * self.settings['chassis']['SCx'] * u**2
-        Flf = 0.5 * self.settings['constants']['airDensity'] * self.settings['chassis']['SCz'] * u**2 * self.settings['chassis']['rAeroBalance']
-        Flr = 0.5 * self.settings['constants']['airDensity'] * self.settings['chassis']['SCz'] * u**2 * (1 - self.settings['chassis']['rAeroBalance'])
+        Fd = -0.5 * self.settings['constants']['airDensity'] * self.settings['chassis']['SCx'] * self.states['u']**2
+        Flf = 0.5 * self.settings['constants']['airDensity'] * self.settings['chassis']['SCz'] * self.states['u']**2 * self.settings['chassis']['rAeroBalance']
+        Flr = 0.5 * self.settings['constants']['airDensity'] * self.settings['chassis']['SCz'] * self.states['u']**2 * (1 - self.settings['chassis']['rAeroBalance'])
 
         # Tyre Slip Calculations - looking into using ca.fmax to avoid division by zero, is this smooth enough or continuous enough?
-        alpha_fl = -delta + ca.atan2( ( (v + self.settings['chassis']['frontLeverArm'] * dpsi) ) , u + 0.5 * self.settings['chassis']['halfTrackWidthFront'] )
-        alpha_fr = -delta + ca.atan2( ( (v + self.settings['chassis']['frontLeverArm'] * dpsi) ) , u - 0.5 * self.settings['chassis']['halfTrackWidthFront'] )
-        alpha_rl = ca.atan2( ( (v - self.settings['chassis']['rearLeverArm'] * dpsi) ) , u + 0.5 * self.settings['chassis']['halfTrackWidthRear'] )
-        alpha_rr = ca.atan2( ( (v - self.settings['chassis']['rearLeverArm'] * dpsi) ) , u - 0.5 * self.settings['chassis']['halfTrackWidthRear'] )
+        alpha_fl = -self.states['delta'] + ca.atan2(((self.states['v'] + self.settings['chassis']['frontLeverArm'] * self.states['dpsi'])), self.states['u'] + 0.5 * self.settings['chassis']['halfTrackWidthFront'])
+        alpha_fr = -self.states['delta'] + ca.atan2(((self.states['v'] + self.settings['chassis']['frontLeverArm'] * self.states['dpsi'])), self.states['u'] - 0.5 * self.settings['chassis']['halfTrackWidthFront'])
+        alpha_rl = ca.atan2(((self.states['v'] - self.settings['chassis']['rearLeverArm'] * self.states['dpsi'])), self.states['u'] + 0.5 * self.settings['chassis']['halfTrackWidthRear'])
+        alpha_rr = ca.atan2(((self.states['v'] - self.settings['chassis']['rearLeverArm'] * self.states['dpsi'])), self.states['u'] - 0.5 * self.settings['chassis']['halfTrackWidthRear'])
 
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fl * 57.2958, 'alpha_fl')
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fr * 57.2958, 'alpha_fr')
@@ -328,10 +271,10 @@ class FormulaOne(BaseModel):
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rr * 57.2958, 'alpha_rr')
 
         # Wheel Longitudinal Slips
-        kappa_fl = Sxfl
-        kappa_fr = Sxfr
-        kappa_rl = Sxrl
-        kappa_rr = Sxrr
+        kappa_fl = self.states['Sxfl']
+        kappa_fr = self.states['Sxfr']
+        kappa_rl = self.states['Sxrl']
+        kappa_rr = self.states['Sxrr']
 
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fl, 'kappa_fl')
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fr, 'kappa_fr')
@@ -339,10 +282,10 @@ class FormulaOne(BaseModel):
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_rr, 'kappa_rr')
 
         # Wheel Loads - Static Load + Aero Load + Longitudinal Load Transfer + Lateral Load Transfer
-        Fz_fl = ( 0.5 * self.settings['chassis']['mass'] * self.settings['chassis']['weightDistribution'] * 9.81 ) + ( 0.5 * Flf ) + (-0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_x / self.settings['chassis']['wheelbase'] ) - ( self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_y * self.settings['chassis']['rollStiffnessDistribution'] / self.settings['chassis']['trackWidthFront'] )
-        Fz_fr = ( 0.5 * self.settings['chassis']['mass'] * self.settings['chassis']['weightDistribution'] * 9.81 ) + ( 0.5 * Flf ) + (-0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_x / self.settings['chassis']['wheelbase'] ) + ( self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_y * self.settings['chassis']['rollStiffnessDistribution'] / self.settings['chassis']['trackWidthFront'] )
-        Fz_rl = ( 0.5 * self.settings['chassis']['mass'] * (1-self.settings['chassis']['weightDistribution']) * 9.81 ) + ( 0.5 * Flr ) + (0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_x / self.settings['chassis']['wheelbase'] ) - ( self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_y * (1-self.settings['chassis']['rollStiffnessDistribution']) / self.settings['chassis']['trackWidthRear'] )
-        Fz_rr = ( 0.5 * self.settings['chassis']['mass'] * (1-self.settings['chassis']['weightDistribution']) * 9.81 ) + ( 0.5 * Flr ) + (0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_x / self.settings['chassis']['wheelbase'] ) + ( self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * acc_y * (1-self.settings['chassis']['rollStiffnessDistribution']) / self.settings['chassis']['trackWidthRear'] )
+        Fz_fl = (0.5 * self.settings['chassis']['mass'] * self.settings['chassis']['weightDistribution'] * 9.81) + (0.5 * Flf) + (-0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_x'] / self.settings['chassis']['wheelbase']) - (self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_y'] * self.settings['chassis']['rollStiffnessDistribution'] / self.settings['chassis']['trackWidthFront'])
+        Fz_fr = (0.5 * self.settings['chassis']['mass'] * self.settings['chassis']['weightDistribution'] * 9.81) + (0.5 * Flf) + (-0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_x'] / self.settings['chassis']['wheelbase']) + (self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_y'] * self.settings['chassis']['rollStiffnessDistribution'] / self.settings['chassis']['trackWidthFront'])
+        Fz_rl = (0.5 * self.settings['chassis']['mass'] * (1 - self.settings['chassis']['weightDistribution']) * 9.81) + (0.5 * Flr) + (0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_x'] / self.settings['chassis']['wheelbase']) - (self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_y'] * (1 - self.settings['chassis']['rollStiffnessDistribution']) / self.settings['chassis']['trackWidthRear'])
+        Fz_rr = (0.5 * self.settings['chassis']['mass'] * (1 - self.settings['chassis']['weightDistribution']) * 9.81) + (0.5 * Flr) + (0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_x'] / self.settings['chassis']['wheelbase']) + (self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_y'] * (1 - self.settings['chassis']['rollStiffnessDistribution']) / self.settings['chassis']['trackWidthRear'])
      
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_fl, 'Fz_fl')
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_fr, 'Fz_fr')
@@ -365,80 +308,80 @@ class FormulaOne(BaseModel):
         self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_rr, 'Fy_rr')
 
         # Tyre Forces in Vehicle Frame
-        Fx = ca.cos(delta) * (Fx_fl + Fx_fr) - ca.sin(delta) * (Fy_fl + Fy_fr) + Fx_rl + Fx_rr + Fd
-        Fy = ca.sin(delta) * (Fx_fl + Fx_fr) + ca.cos(delta) * (Fy_fl + Fy_fr) + Fy_rl + Fy_rr  
-        Mz = ( self.settings['chassis']['frontLeverArm'] * ( ca.cos(delta) * (Fy_fl + Fy_fr) + ca.sin(delta) * (Fx_fl + Fx_fr) ) 
-              + self.settings['chassis']['halfTrackWidthFront'] * ( ca.sin(delta) * (Fy_fr - Fy_fl) - ca.cos(delta) * (Fx_fr - Fx_fl) ) 
+        Fx = ca.cos(self.states['delta']) * (Fx_fl + Fx_fr) - ca.sin(self.states['delta']) * (Fy_fl + Fy_fr) + Fx_rl + Fx_rr + Fd
+        Fy = ca.sin(self.states['delta']) * (Fx_fl + Fx_fr) + ca.cos(self.states['delta']) * (Fy_fl + Fy_fr) + Fy_rl + Fy_rr
+        Mz = ( self.settings['chassis']['frontLeverArm'] * ( ca.cos(self.states['delta']) * (Fy_fl + Fy_fr) + ca.sin(self.states['delta']) * (Fx_fl + Fx_fr) )
+              + self.settings['chassis']['halfTrackWidthFront'] * ( ca.sin(self.states['delta']) * (Fy_fr - Fy_fl) - ca.cos(self.states['delta']) * (Fx_fr - Fx_fl) )
               - self.settings['chassis']['halfTrackWidthRear'] * (Fx_rr - Fx_rl) 
               - self.settings['chassis']['rearLeverArm'] * (Fy_rl + Fy_rr) )
         
-        # Dynamics Scaling Factor
-        Sf = (1 - n*curv)/(u*ca.cos(xi) - v*ca.sin(xi))
+        ## Dynamics Scaling Factor
+        Sf = (1 - self.states['n'] * self.parameters['curv']) / (self.states['u'] * ca.cos(self.states['xi']) - self.states['v'] * ca.sin(self.states['xi']))
+        self.states.derivatives['der_t'] = Sf
 
-        # Dynamics Equations
-        der_n = (u*ca.sin(xi) + v*ca.cos(xi))
-        der_xi = Sf * dpsi - curv
+        ## Path Dynamics        
+        der_acc_x = (-Fx + self.settings['chassis']['mass'] * self.states['acc_x'])/(self.settings['chassis']['mass'] * 0.01)
+        der_acc_y = (Fy - self.settings['chassis']['mass'] * self.states['acc_y'])/(self.settings['chassis']['mass'] * 0.01)
 
-        der_acc_x = (-Fx + self.settings['chassis']['mass'] * acc_x)/(self.settings['chassis']['mass'] * 0.01)
-        der_acc_y = (Fy - self.settings['chassis']['mass'] * acc_y)/(self.settings['chassis']['mass'] * 0.01)
+        self.states.derivatives['der_n'] = Sf * (self.states['u'] * ca.sin(self.states['xi']) + self.states['v'] * ca.cos(self.states['xi'])) # Path Normal Distance - Dynamics
+        self.states.derivatives['der_xi'] = Sf * (self.states['dpsi'] - self.parameters['curv'] / Sf) # Path Heading Angle - Dynamics
+        self.states.derivatives['der_psi'] = Sf * self.states['dpsi'] # Vehicle Heading Angle - Dynamics
+        self.states.derivatives['der_dpsi'] = Sf * (Mz / self.settings['chassis']['Izz']) # Yaw Rate - Dynamics
+        self.states.derivatives['der_x_ir'] = Sf * (self.states['u'] * ca.cos(self.states['psi']) - self.states['v'] * ca.sin(self.states['psi'])) # Global X Position - Dynamics
+        self.states.derivatives['der_y_ir'] = Sf * (self.states['u'] * ca.sin(self.states['psi']) + self.states['v'] * ca.cos(self.states['psi'])) # Global Y Position - Dynamics
 
-        der_dpsi = Mz / self.settings['chassis']['Izz']
-        der_x_ir = ( u * ca.cos(psi) - v * ca.sin(psi) )
-        der_y_ir = ( u * ca.sin(psi) + v * ca.cos(psi) )
-        der_psi = dpsi
-        power_wheel = (Fx - Fd) * u # Cost of drag power
+        ## Chassis Model - Dynamics
+        self.states.derivatives['accx'] = Sf * (self.states['dpsi'] * self.states['v'] + self.states['acc_x'])
+        self.states.derivatives['accy'] = Sf * (-self.states['dpsi'] * self.states['u'] + self.states['acc_y'])
+        self.states.derivatives['der_acc_x'] = Sf * der_acc_x
+        self.states.derivatives['der_acc_y'] = Sf * der_acc_y
 
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
-
-        # Power at Wheel Constraint
-        power_constraint = (rICEThrottle * self.settings['powertrain']['PICEMax'] +  pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency'] + pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency']) - power_wheel # Path Constraint
-        
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, pmguk_deploy + pmguk_harvest, 'power_battery')
-
-        # Model Path Constraints
-        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (0, np.inf) )
-
+        # Chassis Model - Path Constraints
         # Non-Negative Wheel Loads
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_fl, 'Fz_fl_constraint', 1e4, (0, np.inf) )
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_fr, 'Fz_fr_constraint', 1e4, (0, np.inf) )
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_rl, 'Fz_rl_constraint', 1e4, (0, np.inf) )
         self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, Fz_rr, 'Fz_rr_constraint', 1e4, (0, np.inf) )
 
-        # Model Dynamics
-        rhs = ca.SX.sym('rhs', self.states.num_x)
-        rhs[0] = Sf
-        rhs[1] = Sf * der_n
-        rhs[2] = der_xi
-        rhs[3] = Sf * (dpsi*v + acc_x)
-        rhs[4] = Sf * (-dpsi*u + acc_y)
-        rhs[5] = Sf * der_dpsi
-        rhs[6] = Sf * der_x_ir
-        rhs[7] = Sf * der_y_ir
-        rhs[8] = Sf * der_psi
-        rhs[9] = Sf * der_delta
-        rhs[10] = Sf * der_Sxfl
-        rhs[11] = Sf * der_Sxfr
-        rhs[12] = Sf * der_Sxrl
-        rhs[13] = Sf * der_Sxrr
-        rhs[14] = Sf * der_acc_x
-        rhs[15] = Sf * der_acc_y
-        rhs[16] = Sf * der_pmguk_deploy
-        rhs[17] = Sf * der_pmguk_harvest
-        rhs[18] = Sf * -1 * (pmguk_deploy * self.settings['powertrain']['rBatteryEfficiency'] + pmguk_harvest / self.settings['powertrain']['rBatteryEfficiency']) # Deploy results in battery depletion, harvest results in battery charge
-        rhs[19] = Sf * -1 * pmguk_harvest # Harvest results in battery charge
-        rhs[20] = Sf * der_rICEThrottle
+        ## Driver Model - Dynamics
+        self.states.derivatives['der_delta'] = Sf * self.controls['der_delta']
+        self.states.derivatives['der_Sxfl'] = Sf * self.controls['der_Sxfl']
+        self.states.derivatives['der_Sxfr'] = Sf * self.controls['der_Sxfr']
+        self.states.derivatives['der_Sxrl'] = Sf * self.controls['der_Sxrl']
+        self.states.derivatives['der_Sxrr'] = Sf * self.controls['der_Sxrr']
+
+        ## Powertrain Model - Dynamics
+        self.states.derivatives['der_pmguk_deploy'] = Sf * self.controls['der_pmguk_deploy']
+        self.states.derivatives['der_pmguk_harvest'] = Sf * self.controls['der_pmguk_harvest']
+        self.states.derivatives['pmguk_battery'] = Sf * -1 * (self.states['pmguk_deploy'] * self.settings['powertrain']['rBatteryEfficiency'] + self.states['pmguk_harvest'] / self.settings['powertrain']['rBatteryEfficiency'])
+        self.states.derivatives['pmguk_harvest'] = Sf * -1 * self.states['pmguk_harvest']
+        self.states.derivatives['der_rICEThrottle'] = Sf * self.controls['der_rICEThrottle']
+
+        # Assign RHS of the ODEs correctly
+        rhs = ca.vertcat(*[
+            self.states.derivatives[der_name]
+            for der_name in self.states.der_names
+        ])
+
+        # Powertrain Model - Path Constraints
+        power_wheel = (Fx - Fd) * self.states['u'] # Cost of drag power
+        power_constraint = (self.states['rICEThrottle'] * self.settings['powertrain']['PICEMax'] + self.states['pmguk_harvest'] / self.settings['powertrain']['rBatteryEfficiency'] + self.states['pmguk_deploy'] * self.settings['powertrain']['rBatteryEfficiency']) - power_wheel # Path Constraint
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (0, np.inf) )
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, self.states['pmguk_deploy'] + self.states['pmguk_harvest'], 'power_battery')
 
         # Stage Cost
-        cost = ( Sf
-                + ( 0.01 * der_delta**2 ) 
-                + ( 0.0005 * der_Sxfl**2 ) 
-                + ( 0.0005 * der_Sxfr**2 )
-                + ( 0.0005 * der_Sxrl**2 )
-                + ( 0.0005 * der_Sxrr**2 )
-                + ( 0.0005 * der_rICEThrottle**2 )
-                + ( 1e-14 * der_pmguk_deploy)**2
-                + ( 1e-14 * der_pmguk_harvest)**2
-            )
+        self.penalties = DecisionVariables.penalty()
+        self.penalties = DecisionVariables.addPenalty(self.penalties, Sf, 'lap_time')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, 0.01 * self.controls['der_delta']**2, 'steering_rate')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, 0.0005 * self.controls['der_Sxfl']**2, 'front_left_slip_rate')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, 0.0005 * self.controls['der_Sxfr']**2, 'front_right_slip_rate')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, 0.0005 * self.controls['der_Sxrl']**2, 'rear_left_slip_rate')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, 0.0005 * self.controls['der_Sxrr']**2, 'rear_right_slip_rate')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, 0.0005 * self.controls['der_rICEThrottle']**2, 'ice_throttle_rate')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, (1e-14 * self.controls['der_pmguk_deploy'])**2, 'mguk_deploy_rate')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, (1e-14 * self.controls['der_pmguk_harvest'])**2, 'mguk_harvest_rate')
+        cost = ca.sum1(self.penalties.sym)
 
         # Model Function
         self.modelFunction = ca.Function('f', [self.states.sym, self.controls.sym, self.parameters.sym], [rhs, cost, self.path_constraints.sym, self.auxiliary_outputs.sym],['x', 'u', 'g'], ['rhs', 'cost', 'path_constraints', 'auxiliary_outputs'])
@@ -471,7 +414,7 @@ if __name__ == "__main__":
 
     # Simulation Settings
     sim_output_path = '/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/tests'
-    sim_name = 'Baseline_FormulaOne_Spielberg'
+    sim_name = 'FormulaOne_Spielberg_PenaltyRegistry'
 
     # IPOPT Settings
     p_opts = {}
