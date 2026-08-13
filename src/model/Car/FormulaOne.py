@@ -9,6 +9,8 @@ import tools.DecisionVariables as DecisionVariables
 from model.BaseModel import BaseModel
 from model.Car.component.simpleTyre import simpleTyre as simpleTyre
 
+from maths.smooth import smooth_max, smooth_min, smooth_step
+
 # Transcription
 import tools.OptiProblem as OptiProblem
 
@@ -265,47 +267,23 @@ class FormulaOne(BaseModel):
         alpha_rl = ca.atan2(((self.states['v'] - self.settings['chassis']['rearLeverArm'] * self.states['dpsi'])), self.states['u'] + 0.5 * self.settings['chassis']['halfTrackWidthRear'])
         alpha_rr = ca.atan2(((self.states['v'] - self.settings['chassis']['rearLeverArm'] * self.states['dpsi'])), self.states['u'] - 0.5 * self.settings['chassis']['halfTrackWidthRear'])
 
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fl * 57.2958, 'alpha_fl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fr * 57.2958, 'alpha_fr')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rl * 57.2958, 'alpha_rl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rr * 57.2958, 'alpha_rr')
-
         # Wheel Longitudinal Slips
         kappa_fl = self.states['Sxfl']
         kappa_fr = self.states['Sxfr']
         kappa_rl = self.states['Sxrl']
         kappa_rr = self.states['Sxrr']
 
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fl, 'kappa_fl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fr, 'kappa_fr')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_rl, 'kappa_rl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_rr, 'kappa_rr')
-
         # Wheel Loads - Static Load + Aero Load + Longitudinal Load Transfer + Lateral Load Transfer
         Fz_fl = (0.5 * self.settings['chassis']['mass'] * self.settings['chassis']['weightDistribution'] * 9.81) + (0.5 * Flf) + (-0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_x'] / self.settings['chassis']['wheelbase']) - (self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_y'] * self.settings['chassis']['rollStiffnessDistribution'] / self.settings['chassis']['trackWidthFront'])
         Fz_fr = (0.5 * self.settings['chassis']['mass'] * self.settings['chassis']['weightDistribution'] * 9.81) + (0.5 * Flf) + (-0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_x'] / self.settings['chassis']['wheelbase']) + (self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_y'] * self.settings['chassis']['rollStiffnessDistribution'] / self.settings['chassis']['trackWidthFront'])
         Fz_rl = (0.5 * self.settings['chassis']['mass'] * (1 - self.settings['chassis']['weightDistribution']) * 9.81) + (0.5 * Flr) + (0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_x'] / self.settings['chassis']['wheelbase']) - (self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_y'] * (1 - self.settings['chassis']['rollStiffnessDistribution']) / self.settings['chassis']['trackWidthRear'])
         Fz_rr = (0.5 * self.settings['chassis']['mass'] * (1 - self.settings['chassis']['weightDistribution']) * 9.81) + (0.5 * Flr) + (0.5 * self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_x'] / self.settings['chassis']['wheelbase']) + (self.settings['chassis']['hCoG'] * self.settings['chassis']['mass'] * self.states['acc_y'] * (1 - self.settings['chassis']['rollStiffnessDistribution']) / self.settings['chassis']['trackWidthRear'])
-     
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_fl, 'Fz_fl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_fr, 'Fz_fr')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_rl, 'Fz_rl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_rr, 'Fz_rr')
 
         # Tyre Forces in Wheel Frame
         Fy_fl, Fx_fl = simpleTyre( kappa_fl, alpha_fl, Fz_fl, self.settings )
         Fy_fr, Fx_fr = simpleTyre( kappa_fr, alpha_fr, Fz_fr, self.settings )
         Fy_rl, Fx_rl = simpleTyre( kappa_rl, alpha_rl, Fz_rl, self.settings )
         Fy_rr, Fx_rr = simpleTyre( kappa_rr, alpha_rr, Fz_rr, self.settings )
-
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_fl, 'Fx_fl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_fr, 'Fx_fr')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_rl, 'Fx_rl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_rr, 'Fx_rr')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_fl, 'Fy_fl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_fr, 'Fy_fr')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_rl, 'Fy_rl')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_rr, 'Fy_rr')
 
         # Tyre Forces in Vehicle Frame
         Fx = ca.cos(self.states['delta']) * (Fx_fl + Fx_fr) - ca.sin(self.states['delta']) * (Fy_fl + Fy_fr) + Fx_rl + Fx_rr + Fd
@@ -350,25 +328,30 @@ class FormulaOne(BaseModel):
         self.states.derivatives['der_Sxrl'] = Sf * self.controls['der_Sxrl']
         self.states.derivatives['der_Sxrr'] = Sf * self.controls['der_Sxrr']
 
-        ## Powertrain Model - Dynamics
-        self.states.derivatives['der_pmguk_deploy'] = Sf * self.controls['der_pmguk_deploy']
+        ## Powertrain Model - Dynamics 
+
+        # For Deployment, bring in FIA rules
+        # 1. if PMGUK > 100e3, then der_pmguk_deploy is limited to -100e3, otherwise, derivative is free
+        # Use a numerically-stable tanh-based smooth step to avoid exp overflow
+        # when the argument is large. The denominator (1000.0) controls the
+        # transition width (approx transition over a few thousand Watts).
+        # bDerateConstraintActive = smooth_step(self.states['pmguk_deploy'] - 100e3, 5000.0)
+        # der_pmguk_deploy = bDerateConstraintActive * smooth_max(-100e3, self.controls['der_pmguk_deploy'], 5e3) + (1 - bDerateConstraintActive) * self.controls['der_pmguk_deploy']
+
+        self.states.derivatives['der_pmguk_deploy'] = Sf * self.controls['der_pmguk_deploy'] # der_pmguk_deploy
+
+
         self.states.derivatives['der_pmguk_harvest'] = Sf * self.controls['der_pmguk_harvest']
         self.states.derivatives['pmguk_battery'] = Sf * -1 * (self.states['pmguk_deploy'] * self.settings['powertrain']['rBatteryEfficiency'] + self.states['pmguk_harvest'] / self.settings['powertrain']['rBatteryEfficiency'])
         self.states.derivatives['pmguk_harvest'] = Sf * -1 * self.states['pmguk_harvest']
         self.states.derivatives['der_rICEThrottle'] = Sf * self.controls['der_rICEThrottle']
 
-        # Assign RHS of the ODEs correctly
-        rhs = ca.vertcat(*[
-            self.states.derivatives[der_name]
-            for der_name in self.states.der_names
-        ])
-
         # Powertrain Model - Path Constraints
         power_wheel = (Fx - Fd) * self.states['u'] # Cost of drag power
-        power_constraint = (self.states['rICEThrottle'] * self.settings['powertrain']['PICEMax'] + self.states['pmguk_harvest'] / self.settings['powertrain']['rBatteryEfficiency'] + self.states['pmguk_deploy'] * self.settings['powertrain']['rBatteryEfficiency']) - power_wheel # Path Constraint
-        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e5, (0, np.inf) )
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'power_wheel')
-        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, self.states['pmguk_deploy'] + self.states['pmguk_harvest'], 'power_battery')
+        power_ice = self.states['rICEThrottle'] * self.settings['powertrain']['PICEMax']
+        power_mguk = self.states['pmguk_harvest'] / self.settings['powertrain']['rBatteryEfficiency'] + self.states['pmguk_deploy'] * self.settings['powertrain']['rBatteryEfficiency']
+        power_constraint = (power_ice + power_mguk) - power_wheel # + self.controls['slack_power'] # Path Constraint
+        self.path_constraints = DecisionVariables.addPathConstraint(self.path_constraints, power_constraint, 'power_constraint', 1e6, (0, np.inf) )
 
         # Stage Cost
         self.penalties = DecisionVariables.penalty()
@@ -379,11 +362,48 @@ class FormulaOne(BaseModel):
         self.penalties = DecisionVariables.addPenalty(self.penalties, 0.0005 * self.controls['der_Sxrl']**2, 'rear_left_slip_rate')
         self.penalties = DecisionVariables.addPenalty(self.penalties, 0.0005 * self.controls['der_Sxrr']**2, 'rear_right_slip_rate')
         self.penalties = DecisionVariables.addPenalty(self.penalties, 0.0005 * self.controls['der_rICEThrottle']**2, 'ice_throttle_rate')
-        self.penalties = DecisionVariables.addPenalty(self.penalties, (1e-14 * self.controls['der_pmguk_deploy'])**2, 'mguk_deploy_rate')
-        self.penalties = DecisionVariables.addPenalty(self.penalties, (1e-14 * self.controls['der_pmguk_harvest'])**2, 'mguk_harvest_rate')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, (1e-10 * self.controls['der_pmguk_deploy'])**2, 'mguk_deploy_rate')
+        self.penalties = DecisionVariables.addPenalty(self.penalties, (1e-10 * self.controls['der_pmguk_harvest'])**2, 'mguk_harvest_rate')
+        # self.penalties = DecisionVariables.addPenalty(self.penalties, (1e-8 * self.controls['slack_power'])**2, 'slack_power_penalty')
+
         cost = ca.sum1(self.penalties.sym)
 
+        # Auxiliary Outputs
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fd, 'FDrag')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Flf + Flr, 'FDownforce')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Flf, 'FDownforceF')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Flr, 'FDownforceR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, power_wheel, 'PWheel')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, self.states['pmguk_deploy'] + self.states['pmguk_harvest'], 'PBattery')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_fl, 'FxWheelFL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_fr, 'FxWheelFR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_rl, 'FxWheelRL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fx_rr, 'FxWheelRR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_fl, 'FyWheelFL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_fr, 'FyWheelFR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_rl, 'FyWheelRL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fy_rr, 'FyWheelRR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_fl, 'FWheelLoadFL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_fr, 'FWheelLoadFR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_rl, 'FWheelLoadRL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, Fz_rr, 'FWheelLoadRR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fl * 57.2958, 'aSlipFL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_fr * 57.2958, 'aSlipFR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rl * 57.2958, 'aSlipRL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, alpha_rr * 57.2958, 'aSlipRR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fl, 'rSlipFL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_fr, 'rSlipFR')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_rl, 'rSlipRL')
+        self.auxiliary_outputs = DecisionVariables.addAuxiliaryOutput(self.auxiliary_outputs, kappa_rr, 'rSlipRR')
+
         # Model Function
+
+        # Assign RHS of the ODEs correctly
+        rhs = ca.vertcat(*[
+            self.states.derivatives[der_name]
+            for der_name in self.states.der_names
+        ])
+
         self.modelFunction = ca.Function('f', [self.states.sym, self.controls.sym, self.parameters.sym], [rhs, cost, self.path_constraints.sym, self.auxiliary_outputs.sym],['x', 'u', 'g'], ['rhs', 'cost', 'path_constraints', 'auxiliary_outputs'])
 
     def factory():
@@ -394,7 +414,7 @@ class FormulaOne(BaseModel):
         modelFun = modelFun.loadTrackData('/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/component/dataFiles/FormulaOne/Spielberg.csv')
 
         endPoint = modelFun.settings['track']['sLap'][-1]
-        numIntervals = 300 # Number of Phases
+        numIntervals = 200 # Number of Phases
 
         modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
         modelFun.createMesh(endPoint, numIntervals)
@@ -418,12 +438,16 @@ if __name__ == "__main__":
 
     # IPOPT Settings
     p_opts = {}
-    s_opts = {"max_iter": 200, 
+    s_opts = {
+        "max_iter": 800, 
+        # "hessian_approximation": 'limited-memory',   # L-BFGS can help if Hessian is noisy
+        "mu_strategy": 'adaptive',
         "tol" : 1e-6,
         "acceptable_tol": 1e-4,
-        "constr_viol_tol": 1e-3,
-        "compl_inf_tol": 1e-3,
-        "nlp_scaling_method": 'gradient-based',}
+        "constr_viol_tol": 1e-2,
+        "compl_inf_tol": 1e-2,
+        "nlp_scaling_method": 'gradient-based',
+        }
 
     # Generic Optimal Control Sim
 
