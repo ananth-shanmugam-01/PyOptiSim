@@ -240,7 +240,7 @@ class FormulaOne(BaseModel):
         else:
             self.states = DecisionVariables.addState(self.states, 'DeltaSoC', 'pmguk_battery', 1e6, (0, self.settings['powertrain']['DeltaSoCLimit']), 0, (0, 0),  self.initialSolution["DeltaSoC"])
         self.states = DecisionVariables.addState(self.states, 'EMGUKHarvest', 'pmguk_harvest', 1e6, (-1e6, self.settings['powertrain']['EMGUKHarvestMax']), 1, (0, 0),  self.initialSolution["DeltaSoC"])
-        self.states = DecisionVariables.addState(self.states, 'rICEThrottle', 'der_rICEThrottle', 1, (0, 1), 3, (0, 0),  self.initialSolution["rICEThrottle"])
+        self.states = DecisionVariables.addState(self.states, 'rICEThrottle', 'der_rICEThrottle', 10, (0, 1), 3, (0, 0),  self.initialSolution["rICEThrottle"])
 
         # Controls
         self.controls = DecisionVariables.addControl(self.controls, 'der_delta', 1, (-10, 10), self.initialSolution["der_delta"])
@@ -250,7 +250,7 @@ class FormulaOne(BaseModel):
         self.controls = DecisionVariables.addControl(self.controls, 'der_Sxrr', 1, (-10, 10), self.initialSolution["der_Sxr"])
         self.controls = DecisionVariables.addControl(self.controls, 'der_pmguk_deploy', 1e6, (-1e6, 1e6), self.initialSolution["der_pmguk"])
         self.controls = DecisionVariables.addControl(self.controls, 'der_pmguk_harvest', 1e6, (-1e6, 1e6), self.initialSolution["der_pmguk"])
-        self.controls = DecisionVariables.addControl(self.controls, 'der_rICEThrottle', 1, (-10, 10), self.initialSolution["der_rICEThrottle"])
+        self.controls = DecisionVariables.addControl(self.controls, 'der_rICEThrottle', 10, (-10, 10), self.initialSolution["der_rICEThrottle"])
 
         # Parameters
         curv_interp = PchipInterpolator(self.settings['track']['sLap'], self.settings['track']['curv']) (self.mesh_points)
@@ -414,7 +414,7 @@ class FormulaOne(BaseModel):
         modelFun = modelFun.loadTrackData('/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/src/model/Car/component/dataFiles/FormulaOne/Spielberg.csv')
 
         endPoint = modelFun.settings['track']['sLap'][-1]
-        numIntervals = 200 # Number of Phases
+        numIntervals = 300 # Number of Phases
 
         modelFun.createLagrangeCoefficients(3, 'legendre') # collocation degree and strategy
         modelFun.createMesh(endPoint, numIntervals)
@@ -434,7 +434,7 @@ if __name__ == "__main__":
 
     # Simulation Settings
     sim_output_path = '/Users/ananthshanmugam/Desktop/GitHub/PyOptiSim/tests'
-    sim_name = 'FormulaOne_Spielberg_PenaltyRegistry'
+    sim_name = 'FormulaOne_Spielberg_ReScale'
 
     # IPOPT Settings
     p_opts = {}
@@ -444,9 +444,9 @@ if __name__ == "__main__":
         "mu_strategy": 'adaptive',
         "tol" : 1e-6,
         "acceptable_tol": 1e-4,
-        "constr_viol_tol": 1e-2,
-        "compl_inf_tol": 1e-2,
-        "nlp_scaling_method": 'gradient-based',
+        "constr_viol_tol": 1e-3,
+        "compl_inf_tol": 1e-3,
+        "nlp_scaling_method": 'none',
         }
 
     # Generic Optimal Control Sim
